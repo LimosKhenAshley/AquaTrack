@@ -80,7 +80,7 @@ $unreadCount = $unreadCountStmt->fetchColumn();
                 <a href="/AquaTrack/modules/customer/notifications.php" 
                 class="nav-link <?= $currentPage === 'notifications.php' ? 'active bg-primary text-white' : 'text-white' ?>"><span>🔔 Notifications</span>
                 <?php if ($unreadCount > 0): ?>
-                    <span class="badge bg-danger rounded-pill"><?= $unreadCount ?></span>
+                    <span id="notifBadge" class="badge bg-danger rounded-pill ms-1"><?= $count ?></span>
                 <?php endif; ?>
                 </a>
             </li>
