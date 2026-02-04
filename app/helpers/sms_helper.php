@@ -2,17 +2,18 @@
 
 function sendSMS($phone, $message)
 {
-    // Example placeholder for API call
-    // Replace with your SMS provider API
+    if (!$phone) return false;
 
-    $api_url = "https://api.smsprovider.com/send";
+    $apiKey = 'd4f1d3350605bdd2b3660d73d6262484';
 
     $payload = [
-        'to' => $phone,
-        'message' => $message
+        'apikey' => $apiKey,
+        'number' => $phone,
+        'message' => $message,
+        'sendername' => 'AquaTrack'
     ];
 
-    $ch = curl_init($api_url);
+    $ch = curl_init('https://semaphore.co/api/v4/messages');
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

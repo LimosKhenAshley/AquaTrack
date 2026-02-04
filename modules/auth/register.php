@@ -16,6 +16,7 @@ if (isset($_POST['register'])) {
     $full_name = trim($_POST['full_name']);
     $address = trim($_POST['address']);
     $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
     $password_input = $_POST['password'];
     $area_id = $_POST['area_id'];
     $meter_number = trim($_POST['meter_number']);
@@ -42,6 +43,8 @@ if (isset($_POST['register'])) {
         !preg_match('/[0-9]/', $_POST['password'])
     ) {
         $message = "Password must be at least 8 characters, include a number and uppercase letter.";
+    } elseif (!preg_match('/^[0-9]{11}$/', $_POST['phone'])) {
+        $message = "Phone number must be 11 digits and PH Mobile number.";
     }else {
         $password = password_hash($password_input, PASSWORD_DEFAULT);
 
@@ -50,10 +53,10 @@ if (isset($_POST['register'])) {
 
             // Insert user (identity)
             $stmt = $pdo->prepare("
-                INSERT INTO users (full_name, address, email, password, role_id)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (full_name, address, email, phone, password, role_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$full_name, $address, $email, $password, $customerRoleId]);
+            $stmt->execute([$full_name, $address, $email, $phone, $password, $customerRoleId]);
             $user_id = $pdo->lastInsertId();
 
             // Insert customer account
@@ -145,6 +148,11 @@ if (isset($_POST['register'])) {
             <label>Email</label>
             <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email" required>
             <div id="emailFeedback" class="small mt-1"></div>
+        </div>
+
+        <div class="mb-3">
+            <label>Phone Number</label>
+            <input type="text" name="phone" class="form-control" placeholder="09XXXXXXXXX" required>
         </div>
 
         <div class="mb-3">
