@@ -5,6 +5,7 @@ checkRole(['staff']);
 require_once __DIR__ . '/../../app/config/database.php';
 require_once __DIR__ . '/../../app/helpers/audit_helper.php';
 require_once '../../app/helpers/notify.php';
+require_once '../../app/helpers/notify_channels.php';
 
 
 
@@ -149,6 +150,13 @@ try {
         'reading_value' => $reading_value,
         'reading_date' => $reading_date
     ]);
+
+    sendExternalNotification(
+        $pdo,
+        $customer_id,
+        "New AquaTrack Bill",
+        "Your new bill is ₱{$amount}. Due date: {$due_date}."
+    );
 
 } catch (Exception $e) {
 
