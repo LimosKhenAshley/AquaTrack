@@ -84,6 +84,10 @@ $unreadCount = $unreadCountStmt->fetchColumn();
                 <?php endif; ?>
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/customer/preferences.php" 
+                class="nav-link <?= $currentPage === 'preferences.php' ? 'active bg-primary text-white' : 'text-white' ?>">⚙ Preferences</a>
+            </li>
         <?php endif; ?>
 
         <?php if ($role === 'owner'): ?>

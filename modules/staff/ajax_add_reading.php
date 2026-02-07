@@ -151,7 +151,7 @@ try {
         'reading_date' => $reading_date
     ]);
 
-    sendExternalNotification(
+    sendUserNotifications(
         $pdo,
         $customer_id,
         "New AquaTrack Bill",

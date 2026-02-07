@@ -86,6 +86,13 @@ if (isset($_POST['register'])) {
             $pdo->commit();
             $success = true;
             $message = "Customer registered successfully!";
+
+            $user_id = $pdo->lastInsertId();
+
+            $pdo->prepare("
+                INSERT INTO user_contact_preferences (user_id)
+                VALUES (?)
+            ")->execute([$user_id]);
         } catch (Exception $e) {
             $pdo->rollBack();
             $message = "Error registering customer: " . $e->getMessage();
