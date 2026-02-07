@@ -1,6 +1,21 @@
 <?php
 require_once __DIR__ . '/../../app/config/database.php';
 
+function normalizePHPhone($phone)
+    {
+        $phone = preg_replace('/\D+/', '', $phone);
+
+        if (str_starts_with($phone, '09')) {
+            $phone = '63' . substr($phone, 1);
+        }
+
+        if (str_starts_with($phone, '639')) {
+            $phone = '+' . $phone;
+        }
+
+        return $phone;
+    }
+
 $message = "";
 $success = false;
 
@@ -12,11 +27,13 @@ $role = $pdo->prepare("SELECT id FROM roles WHERE role_name='customer'");
 $role->execute();
 $customerRoleId = $role->fetchColumn();
 
+
 if (isset($_POST['register'])) {
     $full_name = trim($_POST['full_name']);
     $address = trim($_POST['address']);
     $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);
+    $raw_phone = $_POST['phone'];
+    $phone = normalizePHPhone($raw_phone);
     $password_input = $_POST['password'];
     $area_id = $_POST['area_id'];
     $meter_number = trim($_POST['meter_number']);
@@ -43,8 +60,8 @@ if (isset($_POST['register'])) {
         !preg_match('/[0-9]/', $_POST['password'])
     ) {
         $message = "Password must be at least 8 characters, include a number and uppercase letter.";
-    } elseif (!preg_match('/^[0-9]{11}$/', $_POST['phone'])) {
-        $message = "Phone number must be 11 digits and PH Mobile number.";
+    }elseif (!preg_match('/^\+639\d{9}$/', $phone)) {
+        $message = "Invalid Philippine mobile number format.";
     }else {
         $password = password_hash($password_input, PASSWORD_DEFAULT);
 
@@ -152,7 +169,18 @@ if (isset($_POST['register'])) {
 
         <div class="mb-3">
             <label>Phone Number</label>
-            <input type="text" name="phone" class="form-control" placeholder="09XXXXXXXXX" required>
+            <input 
+                type="tel"
+                name="phone"
+                id="phone"
+                class="form-control"
+                placeholder="+639XXXXXXXXX"
+                required
+            >
+            <small class="text-muted">
+                Format: +639XXXXXXXXX
+            </small>
+            <div id="phoneFeedback" class="small mt-1"></div>
         </div>
 
         <div class="mb-3">
@@ -236,6 +264,43 @@ if (isset($_POST['register'])) {
     </script>
 
     <script>
+    const phoneInput = document.getElementById('phone');
+    const phoneFeedback = document.getElementById('phoneFeedback');
+
+    phoneInput.addEventListener('blur', function () {
+
+        let v = this.value.trim();
+
+        if (v === '') {
+            phoneFeedback.textContent = '';
+            this.classList.remove('is-invalid','is-valid');
+            return;
+        }
+
+        v = v.replace(/\s+/g,'').replace(/-/g,'');
+
+        if (v.startsWith('09')) v = '+63' + v.substring(1);
+        else if (v.startsWith('639')) v = '+' + v;
+
+        this.value = v;
+
+        const phRegex = /^\+639\d{9}$/;
+
+        if (!phRegex.test(v)) {
+            phoneFeedback.textContent = 'Invalid PH number. Use +639XXXXXXXXX';
+            phoneFeedback.className = 'text-danger small';
+            this.classList.add('is-invalid');
+            this.classList.remove('is-valid');
+        } else {
+            phoneFeedback.textContent = 'Valid phone number';
+            phoneFeedback.className = 'text-success small';
+            this.classList.add('is-valid');
+            this.classList.remove('is-invalid');
+        }
+    });
+    </script>
+
+    <script>
         const passwordInput = document.getElementById('password');
         const strengthBar = document.getElementById('strengthBar');
         const strengthText = document.getElementById('strengthText');
@@ -269,16 +334,6 @@ if (isset($_POST['register'])) {
             }
         });
     </script>
-
-<script>
-    const form = document.querySelector('form');
-    const btn = document.getElementById('registerBtn');
-
-    form.addEventListener('submit', () => {
-        btn.disabled = true;
-        btn.innerHTML = 'Registering...';
-    });
-</script>
 
 <?php if ($success): ?>
     <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
