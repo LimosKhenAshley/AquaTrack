@@ -13,22 +13,11 @@ if ($cfg && $cfg['enabled']) {
     $pdo->exec("
         UPDATE bills
         SET penalty = LEAST(
-            ROUND(
-                amount * {$rate} *
-                GREATEST(
-                    TIMESTAMPDIFF(
-                        MONTH,
-                        DATE_ADD(due_date, INTERVAL {$grace} DAY),
-                        CURDATE()
-                    ),
-                    0
-                ),
-                2
-            ),
+            ROUND(amount * {$rate}, 2),
             amount * {$cap}
         )
         WHERE status = 'unpaid'
-          AND due_date < CURDATE()
+        AND CURDATE() > DATE_ADD(due_date, INTERVAL {$grace} DAY)
     ");
 
     $overdueUsers = $pdo->query("
@@ -37,7 +26,7 @@ if ($cfg && $cfg['enabled']) {
         JOIN customers c ON b.customer_id=c.id
         JOIN users u ON c.user_id=u.id
         WHERE b.status='unpaid'
-        AND b.due_date < CURDATE()
+        AND CURDATE() > DATE_ADD(b.due_date, INTERVAL {$grace} DAY)
         AND b.overdue_notified = 0
     ")->fetchAll();
 
