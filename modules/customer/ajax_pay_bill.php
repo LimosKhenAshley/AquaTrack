@@ -42,7 +42,7 @@ try {
     $stmt->execute([$bill_id, $bill['amount'], $method]);
 
     // mark bill paid
-    $stmt = $pdo->prepare("UPDATE bills SET status='paid' WHERE id=?");
+    $stmt = $pdo->prepare("UPDATE bills SET status='paid', overdue_notified = 1 WHERE id=?");
     $stmt->execute([$bill_id]);
 
     $pdo->commit();

@@ -38,6 +38,7 @@ if ($cfg && $cfg['enabled']) {
         JOIN users u ON c.user_id=u.id
         WHERE b.status='unpaid'
         AND b.due_date < CURDATE()
+        AND b.overdue_notified = 0
     ")->fetchAll();
 
     foreach($overdueUsers as $o){
@@ -48,5 +49,7 @@ if ($cfg && $cfg['enabled']) {
             "Your water bill #{$o['bill_id']} is overdue. Please pay to avoid disconnection.",
             "warning"
         );
+
+        $pdo->prepare("UPDATE bills SET overdue_notified = 1 WHERE id=?")->execute([$o['bill_id']]);
     }
 }
