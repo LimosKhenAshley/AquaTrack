@@ -30,12 +30,15 @@ $customer_id = $customer['customer_id'];
 
 // Get bills
 $bills = $pdo->prepare("
-    SELECT b.id, b.amount, b.penalty, (b.amount + b.penalty) AS total_amount, b.status, b.created_at, b.due_date, r.reading_value
+    SELECT b.id, b.amount, b.penalty, (b.amount + b.penalty) AS total_amount, 
+           b.status, b.created_at, b.due_date, r.reading_value
     FROM bills b
     JOIN readings r ON b.reading_id = r.id
     WHERE b.customer_id = ?
     ORDER BY b.created_at DESC
+    LIMIT 3
 ");
+
 $bills->execute([$customer_id]);
 $billList = $bills->fetchAll();
 
@@ -81,6 +84,33 @@ foreach ($usageData as $row) {
     $usages[] = (float)$row['total_usage'];
 }
 
+
+$statusRow = $pdo->prepare("
+    SELECT service_status 
+    FROM customers 
+    WHERE id = ?
+");
+$statusRow->execute([$customer_id]);
+$accountStatus = $statusRow->fetchColumn();
+
+$nextDue = $pdo->prepare("
+    SELECT MIN(due_date)
+    FROM bills
+    WHERE customer_id = ?
+    AND status = 'unpaid'
+");
+$nextDue->execute([$customer_id]);
+$nextDueDate = $nextDue->fetchColumn();
+
+$lastPay = $pdo->prepare("
+    SELECT MAX(payment_date) FROM payments p
+    JOIN bills b ON b.id = p.bill_id
+    WHERE b.customer_id = ?
+");
+$lastPay->execute([$customer_id]);
+$lastPaymentDate = $lastPay->fetchColumn();
+
+
 ?>
 
 <div class="container mt-4">
@@ -92,26 +122,77 @@ foreach ($usageData as $row) {
     </div>
 
     <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h6>Total Bills</h6>
-                        <h3><?= $summary['total_bills'] ?? 0 ?></h3>
-                    </div>
-                </div>
-            </div>
 
-            <div class="col-md-6">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h6>Unpaid Balance</h6>
-                        <h3 class="text-danger">
-                            ₱<?= number_format($summary['unpaid_total'] ?? 0, 2) ?>
-                        </h3>
-                    </div>
+        <!-- Account Status -->
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h6>Account Status</h6>
+
+                    <?php if($accountStatus === 'active'): ?>
+                        <span class="badge bg-success">Active</span>
+                    <?php elseif($accountStatus === 'disconnected'): ?>
+                        <span class="badge bg-danger">Disconnected</span>
+                    <?php else: ?>
+                        <span class="badge bg-secondary">
+                            <?= htmlspecialchars($accountStatus) ?>
+                        </span>
+                    <?php endif; ?>
+
                 </div>
             </div>
         </div>
+
+        <!-- Next Due Date -->
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>Next Due Date</h6>
+                    <h5>
+                        <?= $nextDueDate 
+                            ? date('M d, Y', strtotime($nextDueDate))
+                            : '—' ?>
+                    </h5>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Payment -->
+        <div class="col-md-4 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h6>Last Payment</h6>
+                    <h5>
+                        <?= $lastPaymentDate 
+                            ? date('M d, Y', strtotime($lastPaymentDate))
+                            : '—' ?>
+                    </h5>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6>Total Bills</h6>
+                    <h3><?= $summary['total_bills'] ?? 0 ?></h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6>Unpaid Balance</h6>
+                    <h3 class="text-danger">
+                        ₱<?= number_format($summary['unpaid_total'] ?? 0, 2) ?>
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="table-responsive">
         <table class="table table-hover table-bordered shadow-sm table-striped mt-3">
@@ -249,7 +330,7 @@ foreach ($usageData as $row) {
                 // Update the table row instantly
                 const btn = document.querySelector(`button[data-bill-id="${formData.get('bill_id')}"]`);
                 const row = btn.closest('tr');
-                row.querySelector('td:nth-child(6)').innerHTML = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                row.querySelector('td:nth-child(7)').innerHTML = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
                 setTimeout(() => bootstrap.Modal.getInstance(payBillModal).hide(), 800);
             } else {
                 msg.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
