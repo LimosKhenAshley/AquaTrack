@@ -65,6 +65,10 @@ $unreadCount = $unreadCountStmt->fetchColumn();
 
         <?php if ($role === 'customer'): ?>
             <li class="nav-item">
+                <a href="/AquaTrack/modules/customer/profile.php" 
+                class="nav-link <?= $currentPage === 'profile.php' ? 'active bg-primary text-white' : 'text-white' ?>">👤 My Profile</a>
+            </li>
+            <li class="nav-item">
                 <a href="/AquaTrack/modules/customer/dashboard.php" 
                 class="nav-link <?= $currentPage === 'dashboard.php' ? 'active bg-primary text-white' : 'text-white' ?>">🏠 My Dashboard</a>
             </li>
