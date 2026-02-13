@@ -12,6 +12,11 @@ $unreadCountStmt = $pdo->prepare("
 $unreadCountStmt->execute([$_SESSION['user']['id']]);
 $unreadCount = $unreadCountStmt->fetchColumn();
 
+$reqCount = $pdo->query("
+    SELECT COUNT(*) 
+    FROM service_requests
+    WHERE status IN ('open','in_progress')
+")->fetchColumn();
 ?>
 
 <div class="col-md-2 bg-dark text-white min-vh-100 p-3" collapse d-md-block" id="sidebar">
@@ -38,6 +43,10 @@ $unreadCount = $unreadCountStmt->fetchColumn();
                 <a href="/AquaTrack/modules/admin/penalties.php"
                 class="nav-link <?= $currentPage === 'penalties.php' ? 'active bg-primary text-white' : 'text-white' ?>">⚠️ Penalties</a>
             </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/admin/service_requests.php"
+                class="nav-link <?= $currentPage === 'service_requests.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛠 Service Requests</a>
+            </li>
         <?php endif; ?>
 
         <?php if ($role === 'staff'): ?>
@@ -61,6 +70,15 @@ $unreadCount = $unreadCountStmt->fetchColumn();
                 <a href="/AquaTrack/modules/staff/disconnections.php"
                 class="nav-link <?= $currentPage === 'disconnections.php' ? 'active bg-primary text-white' : 'text-white' ?>">🔌 Disconnections</a>
             </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/staff/service_requests.php"
+                class="nav-link <?= $currentPage === 'service_requests.php' ? 'active bg-primary text-white' : 'text-white' ?>">
+                🛠 Service Requests
+                <?php if ($reqCount > 0): ?>
+                    <span id="reqBadge" class="badge bg-danger rounded-pill ms-1"><?= $reqCount ?></span>
+                <?php endif; ?>
+                </a>
+            </li>
         <?php endif; ?>
 
         <?php if ($role === 'customer'): ?>
@@ -75,6 +93,14 @@ $unreadCount = $unreadCountStmt->fetchColumn();
             <li class="nav-item">
                 <a href="/AquaTrack/modules/customer/bills.php"
                 class="nav-link <?= $currentPage === 'bills.php' ? 'active bg-primary text-white' : 'text-white' ?>">🧾 My Bills</a>
+            </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/customer/service_request.php"
+                class="nav-link <?= $currentPage === 'service_request.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛠 Service Request</a>
+            </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/customer/my_requests.php"
+                class="nav-link <?= $currentPage === 'my_requests.php' ? 'active bg-primary text-white' : 'text-white' ?>">📩 My Requests</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/customer/payment_history.php"
