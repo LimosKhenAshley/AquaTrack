@@ -324,20 +324,46 @@ $lastPaymentDate = $lastPay->fetchColumn();
         .then(data => {
             const msg = document.getElementById('payBillMessage');
 
-            if(data.status === 'success'){
-                msg.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-                
-                // Update the table row instantly
-                const btn = document.querySelector(`button[data-bill-id="${formData.get('bill_id')}"]`);
-                const row = btn.closest('tr');
-                row.querySelector('td:nth-child(7)').innerHTML = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
-                setTimeout(() => bootstrap.Modal.getInstance(payBillModal).hide(), 800);
+            if (data.status === 'success') {
+
+                const modalInstance = bootstrap.Modal.getInstance(payBillModal);
+
+                payBillModal.addEventListener('hidden.bs.modal', function () {
+
+                    // 🔥 Force cleanup (guaranteed fix)
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                    document.body.style.paddingRight = '';
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Payment Successful',
+                        text: data.message,
+                        confirmButtonColor: '#198754'
+                    });
+
+                    const btn = document.querySelector(
+                        `button[data-bill-id="${formData.get('bill_id')}"]`
+                    );
+
+                    if (btn) {
+                        const row = btn.closest('tr');
+                        row.cells[5].innerHTML =
+                            '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                    }
+
+                }, { once: true });
+
+                modalInstance.hide();
             } else {
                 msg.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
             }
         });
     });
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

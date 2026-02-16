@@ -19,7 +19,7 @@ if(!$bill_id){
 // check if bill belongs to this customer
 $customer_id = $_SESSION['user']['id'];
 $stmt = $pdo->prepare("
-    SELECT id, amount, penalty FROM bills
+    SELECT id, customer_id, amount, penalty FROM bills
     WHERE id = ? AND customer_id = (
         SELECT id FROM customers WHERE user_id = ?
     )
@@ -39,7 +39,9 @@ try {
         INSERT INTO payments (bill_id, amount_paid, method)
         VALUES (?, ?, ?)
     ");
-    $stmt->execute([$bill_id, $bill['amount'], $method]);
+    $total_amount = $bill['amount'] + $bill['penalty'];
+
+    $stmt->execute([$bill_id, $total_amount, $method]);
 
     // mark bill paid
     $stmt = $pdo->prepare("UPDATE bills SET status='paid', overdue_notified = 1 WHERE id=?");
@@ -47,22 +49,21 @@ try {
 
     $pdo->commit();
 
-    // get user id
-    $user = $pdo->prepare("
-        SELECT user_id FROM customers WHERE id=?
-    ");
-    $user->execute([$bill['customer_id']]);
-    $uid = $user->fetchColumn();
+    // Get user_id
+    $userStmt = $pdo->prepare("SELECT user_id FROM customers WHERE id = ?");
+    $userStmt->execute([$bill['customer_id']]);
+    $uid = $userStmt->fetchColumn();
 
     sendNotification(
         $pdo,
         $uid,
         "Payment Received",
-        "Your payment of ₱{$bill['amount']} was successfully recorded.",
+        "Your payment of ₱{$total_amount} was successfully recorded.",
         "payment"
     );
 
     echo json_encode(['status'=>'success','message'=>'Payment successful!']);
+    exit;
 } catch (Exception $e){
     $pdo->rollBack();
     echo json_encode(['status'=>'error','message'=>'Payment failed.']);
