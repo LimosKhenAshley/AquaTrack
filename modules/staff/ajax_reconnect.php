@@ -45,7 +45,7 @@ try{
 
     $pdo->prepare("
         UPDATE customers
-        SET service_status='active'
+        SET service_status='pending_reconnect'
         WHERE id=?
     ")->execute([$customer_id]);
 
