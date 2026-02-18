@@ -6,10 +6,12 @@ require_once __DIR__ . '/../../app/config/database.php';
 require_once __DIR__ . '/../../app/layouts/main.php';
 require_once __DIR__ . '/../../app/layouts/sidebar.php';
 
+$userId = $_SESSION['user']['id'];
+
 /* =========================
    FETCH REQUESTS
 ========================= */
-$rows = $pdo->query("
+$rows = $pdo->prepare("
     SELECT
         dr.*,
         u.full_name,
@@ -17,8 +19,12 @@ $rows = $pdo->query("
     FROM disconnection_requests dr
     JOIN customers c ON dr.customer_id = c.id
     JOIN users u ON c.user_id = u.id
+    WHERE dr.requested_by = ?
     ORDER BY dr.created_at DESC
-    ")->fetchAll();
+");
+
+$rows->execute([$userId]);
+$rows = $rows->fetchAll();
 ?>
 
 <div class="container-fluid px-4 mt-4">

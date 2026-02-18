@@ -3,48 +3,63 @@ require_once '../../app/middleware/auth.php';
 checkRole(['staff']);
 require_once '../../app/config/database.php';
 
-$id = $_POST['id'];
+header('Content-Type: application/json');
 
-$r = $pdo->prepare("
-    SELECT customer_id, action
-    FROM disconnection_requests
-    WHERE id=?
-");
-$r->execute([$id]);
-$row = $r->fetch();
+$id = $_POST['id'] ?? null;
 
-if(!$row){
-echo json_encode(['status'=>'error','message'=>'Not found']);
-exit;
+if(!$id){
+    echo json_encode(['status'=>'error','message'=>'Invalid request']);
+    exit;
 }
 
-$pdo->beginTransaction();
+try{
 
-$pdo->prepare("
-    UPDATE disconnection_requests
-    SET status='completed', completed_date=NOW()
-    WHERE id=?
-")->execute([$id]);
+    $pdo->beginTransaction();
 
-$status = ($row['action']=='disconnect')
-? 'disconnected'
-: 'active';
+    // Get request details
+    $stmt = $pdo->prepare("
+        SELECT customer_id, action
+        FROM disconnection_requests
+        WHERE id=?
+    ");
+    $stmt->execute([$id]);
+    $req = $stmt->fetch();
 
-$pdo->prepare("
-    UPDATE customers
-    SET service_status=?
-    WHERE id=?
-")->execute([$status, $row['customer_id']]);
+    if(!$req){
+        throw new Exception("Request not found");
+    }
 
-/* audit log */
-$pdo->prepare("
-    INSERT INTO audit_logs(user_id,action)
-    VALUES (?,?)
-    ")->execute([
-    $_SESSION['user']['id'],
-    "Completed {$row['action']} for customer {$row['customer_id']}"
-]);
+    // Mark request completed
+    $pdo->prepare("
+        UPDATE disconnection_requests
+        SET status='completed',
+            completed_date=NOW()
+        WHERE id=?
+    ")->execute([$id]);
 
-$pdo->commit();
+    // Update customer service status
+    if($req['action'] === 'disconnect'){
+        $pdo->prepare("
+            UPDATE customers
+            SET service_status='disconnected'
+            WHERE id=?
+        ")->execute([$req['customer_id']]);
+    }
 
-echo json_encode(['status'=>'success','message'=>'Completed']);
+    if($req['action'] === 'reconnect'){
+        $pdo->prepare("
+            UPDATE customers
+            SET service_status='active'
+            WHERE id=?
+        ")->execute([$req['customer_id']]);
+    }
+
+    $pdo->commit();
+
+    echo json_encode(['status'=>'success','message'=>'Request completed successfully']);
+
+}catch(Exception $e){
+
+    $pdo->rollBack();
+    echo json_encode(['status'=>'error','message'=>$e->getMessage()]);
+}

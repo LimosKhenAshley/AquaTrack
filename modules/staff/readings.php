@@ -188,21 +188,25 @@ if (isset($_POST['edit_reading'])) {
                                     </span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-danger btn-sm"
+                                    <?php if($c['service_status'] === 'active'): ?>
+                                        <button class="btn btn-danger btn-sm"
                                             data-bs-toggle="modal"
                                             data-bs-target="#disconnectModal"
                                             data-customer-id="<?= $c['customer_id'] ?>"
                                             data-customer-name="<?= $c['full_name'] ?>">
-                                        Disconnect
-                                    </button>
+                                            Disconnect
+                                        </button>
+                                    <?php endif; ?>
 
-                                    <button class="btn btn-success btn-sm"
+                                    <?php if($c['service_status'] === 'disconnected'): ?>
+                                        <button class="btn btn-success btn-sm"
                                             data-bs-toggle="modal"
                                             data-bs-target="#reconnectModal"
                                             data-customer-id="<?= $c['customer_id'] ?>"
                                             data-customer-name="<?= $c['full_name'] ?>">
-                                        Reconnect
-                                    </button>
+                                            Reconnect
+                                        </button>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -345,6 +349,47 @@ if (isset($_POST['edit_reading'])) {
     </div>
 </div>
 
+<div class="modal fade" id="reconnectModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="reconnectForm">
+                <div class="modal-header">
+                    <h5>Schedule Reconnection</h5>
+                </div>
+                
+                <div class="modal-body">
+
+                <input type="hidden" name="customer_id" id="reconCustomerId">
+
+                <div class="mb-3">
+                    <label>Customer</label>
+                    <input type="text" id="reconCustomerName"
+                        class="form-control" readonly>
+                </div>
+
+                <div class="mb-3">
+                    <label>Reason</label>
+                    <textarea name="reason" class="form-control"></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label>Scheduled Date</label>
+                    <input type="date" name="scheduled_date"
+                        class="form-control" required>
+                </div>
+
+                <div id="reconMsg"></div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-success">Confirm Reconnect</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
 <script>
 // Populate Add Modal
@@ -416,6 +461,62 @@ editModalForm.addEventListener('submit', function(e) {
         }
     });
 });
+
+// Populate Reconnect Modal
+document.getElementById('reconnectModal')
+.addEventListener('show.bs.modal', e => {
+    const btn = e.relatedTarget;
+    reconCustomerId.value = btn.dataset.customerId;
+    reconCustomerName.value = btn.dataset.customerName;
+});
+
+// DISCONNECT AJAX
+document.getElementById('disconnectForm')
+.addEventListener('submit', function(e){
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch('/AquaTrack/modules/staff/ajax_schedule_disconnect.php', {
+        method:'POST',
+        body:formData
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        discMsg.innerHTML =
+            `<div class="alert alert-${data.status==='success'?'success':'danger'}">
+                ${data.message}
+            </div>`;
+
+        if(data.status==='success'){
+            setTimeout(()=> location.reload(),1000);
+        }
+    });
+});
+
+// RECONNECT AJAX
+document.getElementById('reconnectForm')
+.addEventListener('submit', function(e){
+    e.preventDefault();
+    const formData = new FormData(this);
+
+    fetch('/AquaTrack/modules/staff/ajax_reconnect.php', {
+        method:'POST',
+        body:formData
+    })
+    .then(res=>res.json())
+    .then(data=>{
+        reconMsg.innerHTML =
+            `<div class="alert alert-${data.status==='success'?'success':'danger'}">
+                ${data.message}
+            </div>`;
+
+        if(data.status==='success'){
+            setTimeout(()=> location.reload(),1000);
+        }
+    });
+});
 </script>
+
+
 
 <?php require_once __DIR__ . '/../../app/layouts/footer.php'; ?>
