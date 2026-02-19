@@ -19,7 +19,8 @@ $reqCount = $pdo->query("
 ")->fetchColumn();
 ?>
 
-<div class="col-md-2 bg-dark text-white min-vh-100 p-3" collapse d-md-block" id="sidebar">
+<div class="col-12 col-md-2 bg-dark text-white min-vh-100 p-3 collapse d-md-block"
+     id="sidebar">
     <ul class="nav flex-column gap-1">
 
         <?php if ($role === 'admin'): ?>
