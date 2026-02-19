@@ -3,9 +3,9 @@ require_once __DIR__ . '/../../app/middleware/auth.php';
 require_once __DIR__ . '/../../app/config/database.php';
 require_once __DIR__ . '/../../app/libs/fpdf/fpdf.php';
 
-$payment_id = $_GET['payment_id'] ?? null;
+$payment_id = isset($_GET['payment_id']) ? (int) $_GET['payment_id'] : 0;
 
-if (!$payment_id) {
+if ($payment_id <= 0) {
     die("Invalid payment.");
 }
 

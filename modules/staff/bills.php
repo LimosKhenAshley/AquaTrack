@@ -148,14 +148,22 @@ $bills = $stmt->fetchAll();
 </div>
 
 <script>
-const markPaidModal = document.getElementById('markPaidModal');
+const markPaidModalEl = document.getElementById('markPaidModal');
+const markPaidModal = new bootstrap.Modal(markPaidModalEl);
 
-markPaidModal.addEventListener('show.bs.modal', event => {
+markPaidModalEl.addEventListener('show.bs.modal', event => {
     const button = event.relatedTarget;
 
-    document.getElementById('markPaidBillId').value = button.getAttribute('data-bill-id');
-    document.getElementById('markPaidCustomer').textContent = button.getAttribute('data-customer');
-    document.getElementById('markPaidAmount').textContent = button.getAttribute('data-amount');
+    document.getElementById('markPaidBillId').value =
+        button.getAttribute('data-bill-id');
+
+    document.getElementById('markPaidCustomer').textContent =
+        button.getAttribute('data-customer');
+
+    document.getElementById('markPaidAmount').textContent =
+        button.getAttribute('data-amount');
+
+    document.getElementById('markPaidMessage').innerHTML = '';
 });
 
 document.getElementById('markPaidForm').addEventListener('submit', function(e) {
@@ -169,33 +177,58 @@ document.getElementById('markPaidForm').addEventListener('submit', function(e) {
     })
     .then(res => res.json())
     .then(data => {
-        const msg = document.getElementById('markPaidMessage');
 
         if (data.status === 'success') {
-            msg.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
 
-            // Update row instantly
-            const btn = document.querySelector(`button[data-bill-id="${formData.get('bill_id')}"]`);
-            const row = btn.closest('tr');
+            // UPDATE TABLE ROW
+            const btn = document.querySelector(
+                `button[data-bill-id="${formData.get('bill_id')}"]`
+            );
 
-            row.querySelector('td:nth-child(6)').innerHTML =
-                '<span class="badge bg-success">Paid</span>';
+            if (btn) {
+                const row = btn.closest('tr');
 
-            row.querySelector('td:nth-child(7)').innerHTML =
-                '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                row.querySelector('td:nth-child(8)').innerHTML =
+                    '<span class="badge bg-success">Paid</span>';
 
-            setTimeout(() => {
-                bootstrap.Modal.getInstance(markPaidModal).hide();
-            }, 800);
+                row.querySelector('td:nth-child(9)').innerHTML =
+                    '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+            }
+
+            // FIRST close modal completely
+            markPaidModal.hide();
+
+            // Wait until modal fully hidden
+            markPaidModalEl.addEventListener('hidden.bs.modal', function handler() {
+
+                // Remove backdrop manually (extra safety)
+                document.body.classList.remove('modal-open');
+                document.querySelectorAll('.modal-backdrop')
+                    .forEach(el => el.remove());
+
+                // Open receipt AFTER modal fully closes
+                if (data.payment_id) {
+                    window.open(
+                        `/AquaTrack/modules/shared/receipt_pdf.php?payment_id=${data.payment_id}`,
+                        '_blank'
+                    );
+                }
+
+                // Remove this event listener so it doesn't stack
+                markPaidModalEl.removeEventListener('hidden.bs.modal', handler);
+
+            });
 
         } else {
-            msg.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            document.getElementById('markPaidMessage').innerHTML =
+                `<div class="alert alert-danger">${data.message}</div>`;
         }
+
+    })
+    .catch(error => {
+        console.error("Error:", error);
+        alert("Something went wrong.");
     });
-    window.open(
-        `/AquaTrack/modules/shared/receipt.php?id=${data.payment_id}`,
-        '_blank'
-    );
 });
 </script>
 
