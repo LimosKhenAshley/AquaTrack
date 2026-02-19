@@ -47,6 +47,20 @@ try{
     }
 
     if($req['action'] === 'reconnect'){
+
+        // Check reconnection fee is paid
+        $stmt = $pdo->prepare("
+            SELECT reconnection_fee FROM disconnection_requests
+            WHERE id=?
+        ");
+        $stmt->execute([$id]);
+        $fee = $stmt->fetchColumn();
+
+        if($fee > 0){
+            // You may later check if payment exists
+            // For now assume fee is paid manually
+        }
+
         $pdo->prepare("
             UPDATE customers
             SET service_status='active'

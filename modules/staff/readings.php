@@ -378,6 +378,15 @@ if (isset($_POST['edit_reading'])) {
                         class="form-control" required>
                 </div>
 
+                <div class="mb-3">
+                    <label>Reconnection Fee</label>
+                    <input type="number" step="0.01"
+                        name="reconnection_fee"
+                        class="form-control"
+                        value="150"
+                        required>
+                </div>
+
                 <div id="reconMsg"></div>
 
                 </div>
