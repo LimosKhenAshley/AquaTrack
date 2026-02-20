@@ -8,9 +8,48 @@ require_once __DIR__ . '/../../app/layouts/sidebar.php';
 require_once __DIR__ . '/../../app/bootstrap.php';
 
 /* =============================
-   FETCH ALL BILLS
+   PAGINATION + SEARCH
 ============================= */
-$stmt = $pdo->query("
+
+// Search
+$search = trim($_GET['search'] ?? '');
+
+// Pagination setup
+$page = max(1, (int)($_GET['page'] ?? 1));
+$limit = 10; // records per page
+$offset = ($page - 1) * $limit;
+
+// Base WHERE
+$where = "";
+$params = [];
+
+if (!empty($search)) {
+    $where = "WHERE 
+        u.full_name LIKE :search 
+        OR c.meter_number LIKE :search
+        OR b.status LIKE :search";
+    $params[':search'] = "%$search%";
+}
+
+/* =============================
+   COUNT TOTAL RECORDS
+============================= */
+$countStmt = $pdo->prepare("
+    SELECT COUNT(*) 
+    FROM bills b
+    JOIN customers c ON b.customer_id = c.id
+    JOIN users u ON c.user_id = u.id
+    JOIN readings r ON b.reading_id = r.id
+    $where
+");
+$countStmt->execute($params);
+$totalRecords = $countStmt->fetchColumn();
+$totalPages = ceil($totalRecords / $limit);
+
+/* =============================
+   FETCH PAGINATED DATA
+============================= */
+$stmt = $pdo->prepare("
     SELECT
         b.id AS bill_id,
         u.full_name,
@@ -26,8 +65,19 @@ $stmt = $pdo->query("
     JOIN customers c ON b.customer_id = c.id
     JOIN users u ON c.user_id = u.id
     JOIN readings r ON b.reading_id = r.id
+    $where
     ORDER BY b.created_at DESC
+    LIMIT :limit OFFSET :offset
 ");
+
+foreach ($params as $key => $value) {
+    $stmt->bindValue($key, $value);
+}
+
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
+
 $bills = $stmt->fetchAll();
 ?>
 
@@ -36,7 +86,14 @@ $bills = $stmt->fetchAll();
 
     <div class="card shadow-sm">
         <div class="card-body">
-
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text" 
+                        id="liveSearch"
+                        class="form-control"
+                        placeholder="Search customer, meter #, status...">
+                </div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle">
                     <thead class="table-dark">
@@ -52,13 +109,13 @@ $bills = $stmt->fetchAll();
                         <th width="160">Action</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="billingTableBody">
                     <?php foreach ($bills as $bill): ?>
                         <tr>
                             <td><?= htmlspecialchars($bill['full_name']) ?></td>
                             <td><?= htmlspecialchars($bill['meter_number']) ?></td>
-                            <td><?= $bill['reading_date'] ?></td>
-                            <td><?= $bill['reading_value'] ?></td>
+                            <td><?= htmlspecialchars($bill['reading_date']) ?></td>
+                            <td><?= htmlspecialchars($bill['reading_value']) ?></td>
                             <td>₱<?= number_format($bill['amount'], 2) ?></td>
                             <td class="text-danger">
                                 ₱<?= number_format($bill['penalty'], 2) ?>
@@ -102,7 +159,7 @@ $bills = $stmt->fetchAll();
                     </tbody>
                 </table>
             </div>
-
+            <div id="paginationContainer" class="mt-3"></div>
         </div>
     </div>
 </div>
@@ -112,6 +169,7 @@ $bills = $stmt->fetchAll();
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <form id="markPaidForm">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
                 <div class="modal-header bg-success text-white">
                     <h5 class="modal-title">Confirm Payment</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -230,6 +288,103 @@ document.getElementById('markPaidForm').addEventListener('submit', function(e) {
         alert("Something went wrong.");
     });
 });
+</script>
+
+<script>
+const tableBody = document.getElementById('billingTableBody');
+const paginationContainer = document.getElementById('paginationContainer');
+const liveSearch = document.getElementById('liveSearch');
+
+let currentPage = 1;
+let currentSearch = '';
+
+function fetchBills(page = 1, search = '') {
+    fetch(`/AquaTrack/modules/staff/ajax_fetch_bills.php?page=${page}&search=${encodeURIComponent(search)}`)
+        .then(res => res.json())
+        .then(data => {
+
+            tableBody.innerHTML = '';
+
+            if (data.bills.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No bills found.
+                        </td>
+                    </tr>`;
+                paginationContainer.innerHTML = '';
+                return;
+            }
+
+            data.bills.forEach(bill => {
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${bill.full_name}</td>
+                        <td>${bill.meter_number}</td>
+                        <td>${bill.reading_date}</td>
+                        <td>${bill.reading_value}</td>
+                        <td>₱${parseFloat(bill.amount).toFixed(2)}</td>
+                        <td class="text-danger">₱${parseFloat(bill.penalty).toFixed(2)}</td>
+                        <td class="fw-bold">₱${parseFloat(bill.total_amount).toFixed(2)}</td>
+                        <td>
+                            ${bill.status === 'paid'
+                                ? '<span class="badge bg-success">Paid</span>'
+                                : '<span class="badge bg-danger">Unpaid</span>'}
+                        </td>
+                        <td>
+                            ${bill.status === 'unpaid'
+                                ? `<button class="btn btn-success btn-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#markPaidModal"
+                                        data-bill-id="${bill.bill_id}"
+                                        data-customer="${bill.full_name}"
+                                        data-amount="${parseFloat(bill.amount).toFixed(2)}">
+                                        ✔ Mark Paid
+                                   </button>`
+                                : '<button class="btn btn-secondary btn-sm" disabled>Paid</button>'}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            renderPagination(data.totalPages, data.currentPage);
+        });
+}
+
+function renderPagination(totalPages, currentPage) {
+    let html = `<ul class="pagination justify-content-center">`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        html += `
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <button class="page-link" onclick="changePage(${i})">${i}</button>
+            </li>
+        `;
+    }
+
+    html += `</ul>`;
+    paginationContainer.innerHTML = html;
+}
+
+function changePage(page) {
+    currentPage = page;
+    fetchBills(currentPage, currentSearch);
+}
+
+/* Live search with debounce */
+let debounceTimer;
+liveSearch.addEventListener('keyup', function () {
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(() => {
+        currentSearch = this.value;
+        currentPage = 1;
+        fetchBills(currentPage, currentSearch);
+    }, 400); // wait 400ms before searching
+});
+
+/* Initial load */
+fetchBills();
 </script>
 
 <?php require_once __DIR__ . '/../../app/layouts/footer.php'; ?>

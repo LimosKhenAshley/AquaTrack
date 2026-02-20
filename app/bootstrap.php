@@ -2,6 +2,11 @@
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/../app/helpers/notify.php';
 
+// bootstrap.php or auth middleware
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Fetch penalty config
 $cfg = $pdo->query("SELECT * FROM penalty_settings LIMIT 1")->fetch();
 
