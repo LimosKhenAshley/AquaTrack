@@ -4,76 +4,76 @@ checkRole(['staff']);
 require_once '../../app/config/database.php';
 
 header('Content-Type: application/json');
+session_start();
+
+if(!isset($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf']){
+    exit(json_encode(['status'=>'error','message'=>'Invalid CSRF token']));
+}
 
 $id = $_POST['id'] ?? null;
+$userId = $_SESSION['user']['id'];
 
 if(!$id){
-    echo json_encode(['status'=>'error','message'=>'Invalid request']);
-    exit;
+    exit(json_encode(['status'=>'error','message'=>'Invalid request']));
 }
 
 try{
 
-    $pdo->beginTransaction();
+$pdo->beginTransaction();
 
-    // Get request details
-    $stmt = $pdo->prepare("
-        SELECT customer_id, action
-        FROM disconnection_requests
-        WHERE id=?
-    ");
-    $stmt->execute([$id]);
-    $req = $stmt->fetch();
+/* Lock request */
+$stmt=$pdo->prepare("
+    SELECT customer_id, action
+    FROM disconnection_requests
+    WHERE id=? AND requested_by=?
+    FOR UPDATE
+");
 
-    if(!$req){
-        throw new Exception("Request not found");
-    }
+$stmt->execute([$id,$userId]);
+$req=$stmt->fetch();
 
-    // Mark request completed
-    $pdo->prepare("
-        UPDATE disconnection_requests
-        SET status='completed',
-            completed_date=NOW()
-        WHERE id=?
-    ")->execute([$id]);
+if(!$req){
+throw new Exception("Unauthorized request");
+}
 
-    // Update customer service status
-    if($req['action'] === 'disconnect'){
-        $pdo->prepare("
-            UPDATE customers
-            SET service_status='disconnected'
-            WHERE id=?
-        ")->execute([$req['customer_id']]);
-    }
+/* Mark completed */
+$pdo->prepare("
+    UPDATE disconnection_requests
+    SET status='completed',
+    completed_date=NOW()
+    WHERE id=?
+")->execute([$id]);
 
-    if($req['action'] === 'reconnect'){
+/* Update service status */
+if($req['action']=='disconnect'){
+$pdo->prepare("
+    UPDATE customers
+    SET service_status='disconnected'
+    WHERE id=?
+")->execute([$req['customer_id']]);
+}
 
-        // Check reconnection fee is paid
-        $stmt = $pdo->prepare("
-            SELECT reconnection_fee FROM disconnection_requests
-            WHERE id=?
-        ");
-        $stmt->execute([$id]);
-        $fee = $stmt->fetchColumn();
+if($req['action']=='reconnect'){
+$pdo->prepare("
+    UPDATE customers
+    SET service_status='active'
+    WHERE id=?
+")->execute([$req['customer_id']]);
+}
 
-        if($fee > 0){
-            // You may later check if payment exists
-            // For now assume fee is paid manually
-        }
+$pdo->commit();
 
-        $pdo->prepare("
-            UPDATE customers
-            SET service_status='active'
-            WHERE id=?
-        ")->execute([$req['customer_id']]);
-    }
-
-    $pdo->commit();
-
-    echo json_encode(['status'=>'success','message'=>'Request completed successfully']);
+echo json_encode([
+    'status'=>'success',
+    'message'=>'Request completed successfully'
+]);
 
 }catch(Exception $e){
 
-    $pdo->rollBack();
-    echo json_encode(['status'=>'error','message'=>$e->getMessage()]);
+$pdo->rollBack();
+
+echo json_encode([
+    'status'=>'error',
+    'message'=>$e->getMessage()
+]);
 }
