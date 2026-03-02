@@ -6,7 +6,20 @@ require_once __DIR__ . '/../../app/config/database.php';
 require_once __DIR__ . '/../../app/layouts/main.php';
 require_once __DIR__ . '/../../app/layouts/sidebar.php';
 
-define('RATE_PER_CUBIC_METER', 25);
+//Rate Configuration
+$stmt = $pdo->query("
+    SELECT rate_per_unit
+    FROM rates
+    WHERE effective_from <= CURDATE()
+    ORDER BY effective_from DESC
+    LIMIT 1
+");
+
+$currentRate = $stmt->fetchColumn();
+
+if (!$currentRate) {
+    die("No active rate configured.");
+}
 
 $message = '';
 $error = '';
@@ -71,7 +84,7 @@ if (isset($_POST['add_reading'])) {
         $error = "New reading must be greater than previous ({$previousValue}).";
     } else {
         $consumption = $newReading - $previousValue;
-        $amount = $consumption * RATE_PER_CUBIC_METER;
+        $amount = $consumption * $currentRate;
 
         try {
             $pdo->beginTransaction();
@@ -109,7 +122,7 @@ if (isset($_POST['edit_reading'])) {
         $error = "Reading must be positive.";
     } else {
         $customer_id = $reading['customer_id'];
-        $amount = $newValue * RATE_PER_CUBIC_METER;
+        $amount = $newValue * $currentRate;
 
         try {
             $pdo->beginTransaction();
@@ -132,10 +145,11 @@ if (isset($_POST['edit_reading'])) {
 <div class="container-fluid px-4 mt-4">
     <h3 class="mb-3">📏 Meter Readings</h3>
 
-    <form class="d-flex mb-3" method="GET">
-        <input type="text" name="search" class="form-control me-2" placeholder="Search by name or meter #" value="<?= htmlspecialchars($search) ?>">
-        <button class="btn btn-primary">Search</button>
-    </form>
+    <div class="d-flex mb-3">
+        <input type="text" id="liveSearch" 
+            class="form-control me-2"
+            placeholder="Search by name or meter #">
+    </div>
 
     <?php if ($message): ?>
         <div class="alert alert-success"><?= htmlspecialchars($message) ?></div>
@@ -159,7 +173,7 @@ if (isset($_POST['edit_reading'])) {
                             <th>Connection</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="readingsTableBody">
                         <?php foreach ($customers as $c): ?>
                             <tr>
                                 <td><?= htmlspecialchars($c['full_name']) ?></td>
@@ -265,6 +279,15 @@ if (isset($_POST['edit_reading'])) {
                         <label>Reading Value</label>
                         <input type="number" step="0.01" name="reading_value" class="form-control" required>
                     </div>
+                    <div class="alert alert-info mt-2">
+                        <strong>Current Rate:</strong> ₱<?= number_format($currentRate, 2) ?> per cubic meter
+                    </div>
+
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            Estimated Bill: ₱<span id="estimatedBill">0.00</span>
+                        </small>
+                    </div>
                     <div id="addModalMessage"></div>
                 </div>
                 <div class="modal-footer">
@@ -297,6 +320,15 @@ if (isset($_POST['edit_reading'])) {
                     <div class="mb-3">
                         <label>Reading Value</label>
                         <input type="number" step="0.01" name="reading_value" class="form-control" id="editReadingValue" required>
+                    </div>
+                    <div class="alert alert-info mt-2">
+                        <strong>Current Rate:</strong> ₱<?= number_format($currentRate, 2) ?> per cubic meter
+                    </div>
+
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            Updated Bill Amount: ₱<span id="editEstimatedBill">0.00</span>
+                        </small>
                     </div>
                     <div id="editModalMessage"></div>
                 </div>
@@ -401,129 +433,248 @@ if (isset($_POST['edit_reading'])) {
 
 
 <script>
-// Populate Add Modal
-const addModal = document.getElementById('addReadingModal');
-addModal.addEventListener('show.bs.modal', event => {
-    const button = event.relatedTarget;
-    document.getElementById('addCustomerId').value = button.getAttribute('data-customer-id');
-    document.getElementById('addCustomerName').value = button.getAttribute('data-customer-name');
-});
-
-// Populate Edit Modal
-const editModal = document.getElementById('editReadingModal');
-editModal.addEventListener('show.bs.modal', event => {
-    const button = event.relatedTarget;
-    document.getElementById('editReadingId').value = button.getAttribute('data-reading-id');
-    document.getElementById('editCustomerName').value = button.getAttribute('data-customer-name');
-    document.getElementById('editReadingDate').value = button.getAttribute('data-reading-date');
-    document.getElementById('editReadingValue').value = button.getAttribute('data-reading-value');
-});
-
-// Populate Disconnect Modal
-document.getElementById('disconnectModal')
-.addEventListener('show.bs.modal', e => {
-    const btn = e.relatedTarget;
-    discCustomerId.value = btn.dataset.customerId;
-    discCustomerName.value = btn.dataset.customerName;
-});
-
-// Add Reading AJAX
-const addModalForm = document.querySelector('#addReadingModal form');
-addModalForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('/AquaTrack/modules/staff/ajax_add_reading.php', {
-        method: 'POST',
-        body: formData
-    }).then(res => res.json()).then(data => {
-        const messageDiv = document.getElementById('addModalMessage');
-        if(data.status === 'success'){
-            messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-            // Optionally, update the table row inline
-            const customerRow = document.querySelector(`button[data-customer-id="${formData.get('customer_id')}"]`).closest('tr');
-            customerRow.querySelector('td:nth-child(3)').textContent = data.reading_value;
-            customerRow.querySelector('td:nth-child(4)').textContent = data.reading_date;
-        } else {
-            messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-        }
+    const CURRENT_RATE = <?= $currentRate ?>;
+    // Populate Add Modal
+    const addModal = document.getElementById('addReadingModal');
+    addModal.addEventListener('show.bs.modal', event => {
+        const button = event.relatedTarget;
+        document.getElementById('addCustomerId').value = button.getAttribute('data-customer-id');
+        document.getElementById('addCustomerName').value = button.getAttribute('data-customer-name');
     });
-});
 
-// Edit Reading AJAX
-const editModalForm = document.querySelector('#editReadingModal form');
-editModalForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('/AquaTrack/modules/staff/ajax_edit_reading.php', {
-        method: 'POST',
-        body: formData
-    }).then(res => res.json()).then(data => {
-        const messageDiv = document.getElementById('editModalMessage');
-        if(data.status === 'success'){
-            messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-            // Update table row inline
-            const row = document.querySelector(`button[data-reading-id="${formData.get('reading_id')}"]`).closest('tr');
-            row.querySelector('td:nth-child(3)').textContent = data.reading_value;
-            row.querySelector('td:nth-child(4)').textContent = data.reading_date;
-        } else {
-            messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
-        }
+    // Populate Edit Modal
+    const editModal = document.getElementById('editReadingModal');
+    editModal.addEventListener('show.bs.modal', event => {
+        const button = event.relatedTarget;
+        document.getElementById('editReadingId').value = button.getAttribute('data-reading-id');
+        document.getElementById('editCustomerName').value = button.getAttribute('data-customer-name');
+        document.getElementById('editReadingDate').value = button.getAttribute('data-reading-date');
+        document.getElementById('editReadingValue').value = button.getAttribute('data-reading-value');
     });
-});
 
-// Populate Reconnect Modal
-document.getElementById('reconnectModal')
-.addEventListener('show.bs.modal', e => {
-    const btn = e.relatedTarget;
-    reconCustomerId.value = btn.dataset.customerId;
-    reconCustomerName.value = btn.dataset.customerName;
-});
-
-// DISCONNECT AJAX
-document.getElementById('disconnectForm')
-.addEventListener('submit', function(e){
-    e.preventDefault();
-    const formData = new FormData(this);
-
-    fetch('/AquaTrack/modules/staff/ajax_schedule_disconnect.php', {
-        method:'POST',
-        body:formData
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        discMsg.innerHTML =
-            `<div class="alert alert-${data.status==='success'?'success':'danger'}">
-                ${data.message}
-            </div>`;
-
-        if(data.status==='success'){
-            setTimeout(()=> location.reload(),1000);
-        }
+    // Populate Disconnect Modal
+    document.getElementById('disconnectModal')
+    .addEventListener('show.bs.modal', e => {
+        const btn = e.relatedTarget;
+        discCustomerId.value = btn.dataset.customerId;
+        discCustomerName.value = btn.dataset.customerName;
     });
-});
 
-// RECONNECT AJAX
-document.getElementById('reconnectForm')
-.addEventListener('submit', function(e){
-    e.preventDefault();
-    const formData = new FormData(this);
-
-    fetch('/AquaTrack/modules/staff/ajax_reconnect.php', {
-        method:'POST',
-        body:formData
-    })
-    .then(res=>res.json())
-    .then(data=>{
-        reconMsg.innerHTML =
-            `<div class="alert alert-${data.status==='success'?'success':'danger'}">
-                ${data.message}
-            </div>`;
-
-        if(data.status==='success'){
-            setTimeout(()=> location.reload(),1000);
-        }
+    // Add Reading AJAX
+    const addModalForm = document.querySelector('#addReadingModal form');
+    addModalForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('/AquaTrack/modules/staff/ajax_add_reading.php', {
+            method: 'POST',
+            body: formData
+        }).then(res => res.json()).then(data => {
+            const messageDiv = document.getElementById('addModalMessage');
+            if(data.status === 'success'){
+                messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                // Optionally, update the table row inline
+                const customerRow = document.querySelector(`button[data-customer-id="${formData.get('customer_id')}"]`).closest('tr');
+                customerRow.querySelector('td:nth-child(3)').textContent = data.reading_value;
+                customerRow.querySelector('td:nth-child(4)').textContent = data.reading_date;
+            } else {
+                messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+        });
     });
-});
+
+    // Edit Reading AJAX
+    const editModalForm = document.querySelector('#editReadingModal form');
+    editModalForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('/AquaTrack/modules/staff/ajax_edit_reading.php', {
+            method: 'POST',
+            body: formData
+        }).then(res => res.json()).then(data => {
+            const messageDiv = document.getElementById('editModalMessage');
+            if(data.status === 'success'){
+                messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                // Update table row inline
+                const row = document.querySelector(`button[data-reading-id="${formData.get('reading_id')}"]`).closest('tr');
+                row.querySelector('td:nth-child(3)').textContent = data.reading_value;
+                row.querySelector('td:nth-child(4)').textContent = data.reading_date;
+            } else {
+                messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+            }
+        });
+    });
+
+    // ADD MODAL BILL ESTIMATION
+    document.querySelector('#addReadingModal input[name="reading_value"]')
+    .addEventListener('input', function () {
+
+        const customerId = document.getElementById('addCustomerId').value;
+        const lastReading = document.querySelector(
+            `button[data-customer-id="${customerId}"]`
+        )?.dataset.lastReading || 0;
+
+        const newValue = parseFloat(this.value) || 0;
+        const consumption = newValue - parseFloat(lastReading);
+        const amount = consumption > 0 ? consumption * CURRENT_RATE : 0;
+
+        document.getElementById('estimatedBill').textContent =
+            amount.toFixed(2);
+    });
+
+
+    // EDIT MODAL BILL ESTIMATION
+    document.querySelector('#editReadingModal input[name="reading_value"]')
+    .addEventListener('input', function () {
+
+        const newValue = parseFloat(this.value) || 0;
+        const amount = newValue * CURRENT_RATE;
+
+        document.getElementById('editEstimatedBill').textContent =
+            amount.toFixed(2);
+    });
+
+    // Populate Reconnect Modal
+    document.getElementById('reconnectModal')
+    .addEventListener('show.bs.modal', e => {
+        const btn = e.relatedTarget;
+        reconCustomerId.value = btn.dataset.customerId;
+        reconCustomerName.value = btn.dataset.customerName;
+    });
+
+    // DISCONNECT AJAX
+    document.getElementById('disconnectForm')
+    .addEventListener('submit', function(e){
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        fetch('/AquaTrack/modules/staff/ajax_schedule_disconnect.php', {
+            method:'POST',
+            body:formData
+        })
+        .then(res=>res.json())
+        .then(data=>{
+            discMsg.innerHTML =
+                `<div class="alert alert-${data.status==='success'?'success':'danger'}">
+                    ${data.message}
+                </div>`;
+
+            if(data.status==='success'){
+                setTimeout(()=> location.reload(),1000);
+            }
+        });
+    });
+
+    // RECONNECT AJAX
+    document.getElementById('reconnectForm')
+    .addEventListener('submit', function(e){
+        e.preventDefault();
+        const formData = new FormData(this);
+
+        fetch('/AquaTrack/modules/staff/ajax_reconnect.php', {
+            method:'POST',
+            body:formData
+        })
+        .then(res=>res.json())
+        .then(data=>{
+            reconMsg.innerHTML =
+                `<div class="alert alert-${data.status==='success'?'success':'danger'}">
+                    ${data.message}
+                </div>`;
+
+            if(data.status==='success'){
+                setTimeout(()=> location.reload(),1000);
+            }
+        });
+    });
+
+    const searchInput = document.getElementById('liveSearch');
+    const tableBody = document.getElementById('readingsTableBody');
+
+    let debounceTimer;
+
+    searchInput.addEventListener('keyup', function () {
+        clearTimeout(debounceTimer);
+
+        debounceTimer = setTimeout(() => {
+            loadCustomers(this.value);
+        }, 400); // 400ms delay
+    });
+
+    function loadCustomers(search = '', page = 1) {
+        fetch(`/AquaTrack/modules/staff/ajax_search_readings.php?search=${encodeURIComponent(search)}&page=${page}`)
+            .then(res => res.json())
+            .then(data => {
+
+                tableBody.innerHTML = '';
+
+                if (data.customers.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No customers found.
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                data.customers.forEach(c => {
+                    tableBody.innerHTML += `
+                    <tr>
+                        <td>${c.full_name}</td>
+                        <td>${c.meter_number}</td>
+                        <td>${c.last_reading ?? '—'}</td>
+                        <td>${c.last_reading_date ?? '—'}</td>
+                        <td>
+                            <!-- Add Button -->
+                            <button class="btn btn-success btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#addReadingModal"
+                                data-customer-id="${c.customer_id}"
+                                data-customer-name="${c.full_name}"
+                                data-last-reading="${c.last_reading ?? 0}">
+                                ➕ Add
+                            </button>
+
+                            ${c.last_reading !== null ? `
+                            <!-- Edit Button -->
+                            <button class="btn btn-warning btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editReadingModal"
+                                data-reading-id="${c.last_reading_id}"
+                                data-customer-name="${c.full_name}"
+                                data-reading-date="${c.last_reading_date ?? ''}"
+                                data-reading-value="${c.last_reading}">
+                                ✏️ Edit
+                            </button>
+                            ` : ''}
+                        </td>
+                        <td>
+                            <span class="badge bg-warning">
+                                ${c.service_status}
+                            </span>
+                        </td>
+                        <td>
+                            ${c.service_status === 'active'
+                                ? `<button class="btn btn-danger btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#disconnectModal"
+                                    data-customer-id="${c.customer_id}"
+                                    data-customer-name="${c.full_name}">
+                                    Disconnect
+                                </button>`
+                                : `<button class="btn btn-success btn-sm"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#reconnectModal"
+                                    data-customer-id="${c.customer_id}"
+                                    data-customer-name="${c.full_name}">
+                                    Reconnect
+                                </button>`
+                            }
+                        </td>
+                    </tr>`;
+                });
+            });
+    }
 </script>
 
 

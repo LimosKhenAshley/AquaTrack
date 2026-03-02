@@ -8,9 +8,6 @@ require_once '../../app/helpers/notify.php';
 require_once '../../app/helpers/notify_channels.php';
 
 
-
-define('RATE_PER_CUBIC_METER', 25);
-
 header('Content-Type: application/json');
 
 $customer_id = $_POST['customer_id'] ?? null;
@@ -72,10 +69,31 @@ if ($reading_value <= $previousValue) {
 }
 
 /* =============================
+   Fetch current active rate
+============================= */
+$rateStmt = $pdo->query("
+    SELECT rate_per_unit
+    FROM rates
+    WHERE effective_from <= CURDATE()
+    ORDER BY effective_from DESC
+    LIMIT 1
+");
+
+$currentRate = $rateStmt->fetchColumn();
+
+if (!$currentRate) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No active water rate configured.'
+    ]);
+    exit;
+}
+
+/* =============================
    Compute bill
 ============================= */
 $consumption = $reading_value - $previousValue;
-$amount = $consumption * RATE_PER_CUBIC_METER;
+$amount = $consumption * $currentRate;
 
 /* =============================
    Fetch penalty configuration
@@ -97,18 +115,21 @@ try {
 
     $reading_id = $pdo->lastInsertId();
 
+    $due_date = date('Y-m-d', strtotime($reading_date . " + {$grace_days} days"));
+
     /* Insert bill */
     $stmt = $pdo->prepare("
         INSERT INTO bills 
-        (customer_id, reading_id, amount, penalty, status, due_date)
-        VALUES (?, ?, ?, 0, 'unpaid', DATE_ADD(?, INTERVAL ? DAY))
+        (customer_id, reading_id, amount, penalty, status, due_date, rate_used)
+        VALUES (?, ?, ?, 0, 'unpaid', ?, ?)
     ");
+
     $stmt->execute([
         $customer_id,
         $reading_id,
         $amount,
-        $reading_date,
-        $grace_days
+        $due_date,
+        $currentRate
     ]);
 
     $pdo->commit();
