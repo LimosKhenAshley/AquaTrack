@@ -12,11 +12,19 @@ $unreadCountStmt = $pdo->prepare("
 $unreadCountStmt->execute([$_SESSION['user']['id']]);
 $unreadCount = $unreadCountStmt->fetchColumn();
 
-$reqCount = $pdo->query("
+// Show count for unassigned requests + requests assigned to current staff
+$reqCountStmt = $pdo->prepare("
     SELECT COUNT(*) 
     FROM service_requests
-    WHERE status IN ('open','in_progress')
-")->fetchColumn();
+    WHERE status IN ('open', 'in_progress') 
+    OR (
+        assigned_staff_id IS NULL 
+        OR assigned_staff_id = 0 
+        OR assigned_staff_id = ?
+    )
+");
+$reqCountStmt->execute([$_SESSION['user']['id']]);
+$reqCount = $reqCountStmt->fetchColumn();
 ?>
 
 <div class="col-12 col-md-2 bg-dark text-white min-vh-100 p-3 collapse d-md-block"
