@@ -12,19 +12,27 @@ $unreadCountStmt = $pdo->prepare("
 $unreadCountStmt->execute([$_SESSION['user']['id']]);
 $unreadCount = $unreadCountStmt->fetchColumn();
 
-// Show count for unassigned requests + requests assigned to current staff
-$reqCountStmt = $pdo->prepare("
-    SELECT COUNT(*) 
-    FROM service_requests
-    WHERE status IN ('open', 'in_progress') 
-    OR (
-        assigned_staff_id IS NULL 
-        OR assigned_staff_id = 0 
-        OR assigned_staff_id = ?
-    )
-");
-$reqCountStmt->execute([$_SESSION['user']['id']]);
-$reqCount = $reqCountStmt->fetchColumn();
+// For staff, fetch count of open/in-progress service requests assigned to them or unassigned
+if ($role === 'staff') {
+    // Get the actual staff ID (not user ID)
+    $staffLookup = $pdo->prepare("SELECT id FROM staffs WHERE user_id = ?");
+    $staffLookup->execute([$_SESSION['user']['id']]);
+    $staffId = $staffLookup->fetchColumn();
+
+    if ($staffId) {
+        $reqCountStmt = $pdo->prepare("
+            SELECT COUNT(*) 
+            FROM service_requests
+            WHERE status IN ('open', 'in_progress')
+            AND (
+                assigned_staff_id IS NULL 
+                OR assigned_staff_id = ?
+            )
+        ");
+        $reqCountStmt->execute([$staffId]); // ← staff ID, not user ID
+        $reqCount = $reqCountStmt->fetchColumn();
+    }
+}
 ?>
 
 <div class="col-12 col-md-2 bg-dark text-white min-vh-100 p-3 collapse d-md-block"
@@ -106,10 +114,6 @@ $reqCount = $reqCountStmt->fetchColumn();
             <li class="nav-item">
                 <a href="/AquaTrack/modules/customer/service_request.php"
                 class="nav-link <?= $currentPage === 'service_request.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛠 Service Request</a>
-            </li>
-            <li class="nav-item">
-                <a href="/AquaTrack/modules/customer/my_requests.php"
-                class="nav-link <?= $currentPage === 'my_requests.php' ? 'active bg-primary text-white' : 'text-white' ?>">📩 My Requests</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/customer/payment_history.php"
