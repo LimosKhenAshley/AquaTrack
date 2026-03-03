@@ -26,7 +26,7 @@ $notes = trim($_POST['staff_notes'] ?? '');
 ================================ */
 
 /* 1️⃣ Status whitelist */
-$allowed = ['open', 'in_progress', 'resolved', 'rejected'];
+$allowed = ['open', 'in_progress', 'resolved', 'rejected', 'cancelled'];
 if (!in_array($status, $allowed)) {
     die("Invalid status");
 }

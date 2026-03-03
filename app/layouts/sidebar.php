@@ -81,7 +81,7 @@ if ($role === 'staff') {
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/staff/payments.php"
-                class="nav-link <?= $currentPage === 'payments.php' ? 'active bg-primary text-white' : 'text-white' ?>">💵 Payment History</a>
+                class="nav-link <?= $currentPage === 'payments.php' ? 'active bg-primary text-white' : 'text-white' ?>">💵 Payments</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/staff/disconnections.php"

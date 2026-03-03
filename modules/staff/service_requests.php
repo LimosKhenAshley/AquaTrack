@@ -40,7 +40,8 @@ if ($tab === 'assigned') {
 } elseif ($tab === 'completed') {
     $where[] = "sr.status = 'resolved'";
 } elseif ($tab === 'overdue') {
-    $where[] = "sr.status != 'resolved' AND TIMESTAMPDIFF(HOUR, sr.created_at, NOW()) > 24";
+    $where[] = "sr.status NOT IN ('resolved','cancelled','rejected')
+                AND TIMESTAMPDIFF(HOUR, sr.created_at, NOW()) > 24";
 }
 
 if ($statusFilter) {
@@ -198,6 +199,7 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                         <option value="in_progress" <?= $statusFilter == 'in_progress' ? 'selected' : '' ?>>In Progress</option>
                         <option value="resolved" <?= $statusFilter == 'resolved' ? 'selected' : '' ?>>Resolved</option>
                         <option value="rejected" <?= $statusFilter == 'rejected' ? 'selected' : '' ?>>Rejected</option>
+                        <option value="cancelled" <?= $statusFilter == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
                     </select>
                 </div>
                 <div class="col-lg-2">
@@ -272,6 +274,7 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                                     'resolved' => 'success',
                                     'in_progress' => 'info',
                                     'rejected' => 'dark',
+                                    'cancelled' => 'danger',
                                     default => 'secondary'
                                 };
                             ?>
@@ -413,6 +416,7 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                                 <option value="in_progress">In Progress</option>
                                 <option value="resolved">Resolved</option>
                                 <option value="rejected">Rejected</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </div>
                         
