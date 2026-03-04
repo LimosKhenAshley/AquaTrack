@@ -68,7 +68,7 @@ if (isset($_POST['register'])) {
         try {
             $pdo->beginTransaction();
 
-            // Insert user (identity)
+            // Insert user
             $stmt = $pdo->prepare("
                 INSERT INTO users (full_name, address, email, phone, password, role_id)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -76,25 +76,31 @@ if (isset($_POST['register'])) {
             $stmt->execute([$full_name, $address, $email, $phone, $password, $customerRoleId]);
             $user_id = $pdo->lastInsertId();
 
-            // Insert customer account
+            // Insert customer
             $stmt2 = $pdo->prepare("
                 INSERT INTO customers (user_id, area_id, meter_number)
                 VALUES (?, ?, ?)
             ");
             $stmt2->execute([$user_id, $area_id, $meter_number]);
 
+            // Insert contact preferences (MOVE IT HERE)
+            $stmt3 = $pdo->prepare("
+                INSERT INTO user_contact_preferences (user_id)
+                VALUES (?)
+            ");
+            $stmt3->execute([$user_id]);
+
             $pdo->commit();
+
             $success = true;
             $message = "Customer registered successfully!";
 
-            $user_id = $pdo->lastInsertId();
-
-            $pdo->prepare("
-                INSERT INTO user_contact_preferences (user_id)
-                VALUES (?)
-            ")->execute([$user_id]);
         } catch (Exception $e) {
-            $pdo->rollBack();
+
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
             $message = "Error registering customer: " . $e->getMessage();
         }
     }
@@ -105,121 +111,278 @@ if (isset($_POST['register'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>AquaTrack — Customer Registration</title>
+    <title>AquaTrack - Customer Registration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
     <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
         body {
-            background: linear-gradient(to right, #198754, #0d6efd);
+            background: var(--primary-gradient);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
         }
-        .register-card {
-            background: #fff;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.2);
+
+        .bubbles {
+            position: absolute;
             width: 100%;
-            max-width: 500px;
+            height: 100%;
+            overflow: hidden;
+            top: 0;
+            left: 0;
+            pointer-events: none;
         }
-        .register-card h3 {
-            text-align: center;
-            margin-bottom: 1.5rem;
-            color: #198754;
+
+        .bubble {
+            position: absolute;
+            bottom: -100px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            animation: rise 12s infinite ease-in;
         }
-        .register-card .btn-success {
-            background: #198754;
-            border: none;
+
+        @keyframes rise {
+            0% { bottom: -100px; transform: translateX(0); }
+            100% { bottom: 1200px; transform: translateX(-200px); }
         }
-        .register-card .btn-success:hover {
-            background: #157347;
+
+        .bubble:nth-child(1){ left:10%; width:80px;height:80px;}
+        .bubble:nth-child(2){ left:30%; width:40px;height:40px;}
+        .bubble:nth-child(3){ left:60%; width:100px;height:100px;}
+        .bubble:nth-child(4){ left:80%; width:50px;height:50px;}
+
+        .register-container {
+            width: 100%;
+            max-width: 520px;
+            position: relative;
+            z-index: 10;
         }
-        .register-footer {
-            text-align: center;
-            margin-top: 1rem;
-            font-size: 0.9rem;
+
+        .register-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: slideUp .5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {opacity:0; transform:translateY(30px);}
+            to {opacity:1; transform:translateY(0);}
+        }
+
+        .register-header {
+            text-align:center;
+            margin-bottom:2rem;
+        }
+
+        .logo {
+            width:80px;
+            height:80px;
+            background: var(--primary-gradient);
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            margin:0 auto 1rem;
+            box-shadow:0 10px 30px rgba(102,126,234,0.4);
+        }
+
+        .logo i {
+            font-size:40px;
+            color:white;
+        }
+
+        .form-label {
+            font-weight:600;
+            text-transform:uppercase;
+            font-size:0.8rem;
+            color:#4a5568;
+        }
+
+        .form-control, .input-group-text, .form-select {
+            border:2px solid #e2e8f0;
+            transition:0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color:#667eea;
+            box-shadow:none;
+        }
+
+        .input-group-text {
+            background:transparent;
+            border-right:none;
+            color:#a0aec0;
+        }
+
+        .form-control {
+            border-left:none;
+        }
+
+        .btn-register {
+            background: var(--primary-gradient);
+            color:white;
+            font-weight:700;
+            padding:0.9rem;
+            border-radius:12px;
+            text-transform:uppercase;
+            border:none;
+            margin-top:1rem;
+            transition:0.3s;
+        }
+
+        .btn-register:hover {
+            transform:translateY(-2px);
+            box-shadow:0 10px 30px rgba(102,126,234,0.4);
+        }
+
+        .alert {
+            border-radius:12px;
+        }
+
+        .login-link {
+            text-align:center;
+            margin-top:1.5rem;
+            padding-top:1rem;
+            border-top:2px solid #edf2f7;
+        }
+
+        .login-link a {
+            color:#667eea;
+            font-weight:600;
+            text-decoration:none;
+        }
+
+        .login-link a:hover {
+            text-decoration:underline;
         }
     </style>
 </head>
 <body>
 
-<div class="register-card">
-    <h3>💧 AquaTrack Registration</h3>
+<div class="bubbles">
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+</div>
 
-    <?php if (!empty($message)): ?>
-        <div class="alert <?= $success ? 'alert-success' : 'alert-danger' ?> text-center">
-            <?= htmlspecialchars($message) ?>
-        </div>
-    <?php endif; ?>
+<div class="register-container">
+    <div class="register-card">
 
-
-    <form method="POST">
-        <div class="mb-3">
-            <label>Full Name</label>
-            <input type="text" name="full_name" class="form-control" placeholder="Enter your full name" required>
-        </div>
-
-        <div class="mb-3">
-            <label>Address</label>
-            <textarea name="address" class="form-control" rows="2"
-                    placeholder="House No., Street, Barangay, City" required></textarea>
-        </div>
-
-        <div class="mb-3">
-            <label>Email</label>
-            <input type="email" id="email" name="email" class="form-control" placeholder="Enter your email" required>
-            <div id="emailFeedback" class="small mt-1"></div>
-        </div>
-
-        <div class="mb-3">
-            <label>Phone Number</label>
-            <input 
-                type="tel"
-                name="phone"
-                id="phone"
-                class="form-control"
-                placeholder="+639XXXXXXXXX"
-                required
-            >
-            <small class="text-muted">
-                Format: +639XXXXXXXXX
-            </small>
-            <div id="phoneFeedback" class="small mt-1"></div>
-        </div>
-
-        <div class="mb-3">
-            <label>Password</label>
-            <input type="password" name="password" id="password" class="form-control" required>
-            <div class="progress mt-2" style="height: 6px;">
-                <div id="strengthBar" class="progress-bar"></div>
+        <div class="register-header">
+            <div class="logo">
+                <i class="bi bi-droplet"></i>
             </div>
-            <small id="strengthText" class="text-muted"></small>
+            <h2>Create Account</h2>
+            <p class="text-muted">Register to start using AquaTrack</p>
         </div>
 
-        <div class="mb-3">
-            <label>Area</label>
-            <select name="area_id" class="form-select" required>
-                <option value="">Select Area</option>
-                <?php foreach ($areas as $a): ?>
-                    <option value="<?= $a['id'] ?>"><?= htmlspecialchars($a['area_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <?php if (!empty($message)): ?>
+            <div class="alert alert-<?= $success ? 'success' : 'danger' ?> alert-dismissible fade show">
+                <?= htmlspecialchars($message) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
 
-        <div class="mb-3">
-            <label>Meter Number</label>
-            <input type="text" id="meter_number" name="meter_number" class="form-control" placeholder="Enter meter number" required>
-            <div id="meterFeedback" class="small mt-1"></div>
-        </div>
+        <form method="POST">
 
-        <button type="submit" class="btn btn-success w-100" name="register">Register</button>
-    </form>
+            <!-- Full Name -->
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text" name="full_name" class="form-control" placeholder="Juan Dela Cruz" required>
+                </div>
+            </div>
 
-    <div class="register-footer">
-        <span>Already have an account? <a href="login.php" class="text-decoration-underline">Login here</a></span>
+            <!-- Address -->
+            <div class="mb-3">
+                <label class="form-label">Address</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                    <textarea name="address" class="form-control" rows="2" placeholder="House No., Street, Barangay, City" required ></textarea>
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+                <label class="form-label">Email</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                    <input type="email" name="email" id="email" class="form-control" placeholder="juan.delacruz@example.com" required>
+                </div>
+                <div id="emailFeedback" class="small mt-1"></div>
+            </div>
+
+            <!-- Phone -->
+            <div class="mb-3">
+                <label class="form-label">Phone</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                    <input type="tel" name="phone" id="phone" class="form-control" placeholder="+639123456789" required>
+                </div>
+                <div id="phoneFeedback" class="small mt-1"></div>
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                    <input type="password" name="password" id="password" class="form-control" placeholder="Create a strong password" required>
+                </div>
+                <div class="progress mt-2" style="height:6px;">
+                    <div id="strengthBar" class="progress-bar"></div>
+                </div>
+                <small id="strengthText" class="text-muted"></small>
+            </div>
+
+            <!-- Area -->
+            <div class="mb-3">
+                <label class="form-label">Area</label>
+                <select name="area_id" class="form-select" required>
+                    <option value="">Select Area</option>
+                    <?php foreach ($areas as $a): ?>
+                        <option value="<?= $a['id'] ?>"><?= htmlspecialchars($a['area_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <!-- Meter -->
+            <div class="mb-3">
+                <label class="form-label">Meter Number</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-speedometer2"></i></span>
+                    <input type="text" name="meter_number" id="meter_number" class="form-control" placeholder="Enter meter number" required>
+                </div>
+                <div id="meterFeedback" class="small mt-1"></div>
+            </div>
+
+            <button type="submit" name="register" class="btn-register w-100">
+                Create Account
+            </button>
+
+            <div class="login-link">
+                Already have an account?
+                <a href="login.php">Sign In</a>
+            </div>
+
+        </form>
     </div>
 </div>
 
@@ -343,32 +506,78 @@ if (isset($_POST['register'])) {
     </script>
 
 <?php if ($success): ?>
-    <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Registration Successful</h5>
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
+
+            <!-- Gradient Top Banner -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        padding: 2rem;
+                        text-align:center;
+                        position:relative;">
+
+                <div style="
+                    width:90px;
+                    height:90px;
+                    background:rgba(255,255,255,0.15);
+                    border-radius:50%;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    margin:0 auto;
+                    backdrop-filter:blur(6px);
+                ">
+                    <i class="bi bi-check-lg text-white" style="font-size:45px;"></i>
                 </div>
-                <div class="modal-body text-center">
-                    <p>Your account has been created successfully.</p>
-                    <p>You may now log in to AquaTrack.</p>
-                </div>
-                <div class="modal-footer">
-                    <a href="login.php" class="btn btn-success w-100">Go to Login</a>
-                    <small class="text-muted">Redirecting to login in 3 seconds...</small>
-                </div>
+
+                <h4 class="text-white mt-3 mb-0 fw-bold">
+                    Registration Successful
+                </h4>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body text-center p-4">
+
+                <p class="mb-2 fs-5 fw-semibold">
+                    🎉 Your AquaTrack account has been created!
+                </p>
+
+                <p class="text-muted mb-4">
+                    You can now log in and start managing your water services.
+                </p>
+
+                <a href="login.php" class="btn btn-lg w-100"
+                   style="
+                       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                       color:white;
+                       font-weight:600;
+                       border-radius:12px;
+                       padding:0.75rem;
+                       transition:0.3s;
+                   "
+                   onmouseover="this.style.transform='translateY(-2px)'"
+                   onmouseout="this.style.transform='translateY(0)'"
+                >
+                    Go to Login
+                </a>
+
+                <small class="d-block text-muted mt-3">
+                    Redirecting automatically in 3 seconds...
+                </small>
+
             </div>
         </div>
     </div>
+</div>
 
-    <script>
-        const modal = new bootstrap.Modal(document.getElementById('successModal'));
-        modal.show();
+<script>
+    const modal = new bootstrap.Modal(document.getElementById('successModal'));
+    modal.show();
 
-        setTimeout(() => {
-            window.location.href = "login.php";
-        }, 3000);
-    </script>
+    setTimeout(() => {
+        window.location.href = "login.php";
+    }, 3000);
+</script>
 <?php endif; ?>
 
 </body>
