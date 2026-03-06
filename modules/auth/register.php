@@ -29,79 +29,107 @@ $customerRoleId = $role->fetchColumn();
 
 
 if (isset($_POST['register'])) {
-    $full_name = trim($_POST['full_name']);
+
+    $first_name = trim($_POST['first_name']);
+    $last_name = trim($_POST['last_name']);
+    $full_name = $first_name . ' ' . $last_name;
+    $nameRegex = "/^[a-zA-Z\s'-]{2,50}$/";
+
     $address = trim($_POST['address']);
     $email = trim($_POST['email']);
     $raw_phone = $_POST['phone'];
     $phone = normalizePHPhone($raw_phone);
+
     $password_input = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+
     $area_id = $_POST['area_id'];
     $meter_number = trim($_POST['meter_number']);
 
+    // Gmail validation
+    if (!preg_match('/^[a-zA-Z0-9._%+-]+@gmail\.com$/', $email)) {
+        $message = "Only Gmail addresses are allowed.";
+    }
+
+    //Name validation
+    else if (!preg_match($nameRegex, $first_name)) {
+    $message = "First name contains invalid characters.";
+    }
+    elseif (!preg_match($nameRegex, $last_name)) {
+        $message = "Last name contains invalid characters.";
+    }
+
+    // Confirm password validation
+    elseif ($password_input !== $confirm_password) {
+        $message = "Passwords do not match.";
+    }
+
     // Check if email already exists
-    $emailCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
-    $emailCheck->execute([$email]);
-    $emailExists = $emailCheck->fetchColumn();
+    else {
+        $emailCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+        $emailCheck->execute([$email]);
+        $emailExists = $emailCheck->fetchColumn();
 
-    // Check if meter number already exists
-    $meterCheck = $pdo->prepare("SELECT COUNT(*) FROM customers WHERE meter_number = ?");
-    $meterCheck->execute([$meter_number]);
-    $meterExists = $meterCheck->fetchColumn();
+        $meterCheck = $pdo->prepare("SELECT COUNT(*) FROM customers WHERE meter_number = ?");
+        $meterCheck->execute([$meter_number]);
+        $meterExists = $meterCheck->fetchColumn();
 
-    if ($emailExists) {
-        $message = "Email is already registered.";
-    } elseif ($meterExists) {
-        $message = "Meter number already exists.";
-    } elseif ($full_name === '' || $address === '' || $email === '' || $password_input === '' || $area_id === '' || $meter_number === '') {
-        $message = "All fields are required.";
-    } elseif (
-        strlen($_POST['password']) < 8 ||
-        !preg_match('/[A-Z]/', $_POST['password']) ||
-        !preg_match('/[0-9]/', $_POST['password'])
-    ) {
-        $message = "Password must be at least 8 characters, include a number and uppercase letter.";
-    }elseif (!preg_match('/^\+639\d{9}$/', $phone)) {
-        $message = "Invalid Philippine mobile number format.";
-    }else {
-        $password = password_hash($password_input, PASSWORD_DEFAULT);
+        if ($emailExists) {
+            $message = "Email is already registered.";
+        } elseif ($meterExists) {
+            $message = "Meter number already exists.";
+        } elseif ($first_name === '' || $last_name === '' || $address === '' || $email === '' || $password_input === '' || $area_id === '' || $meter_number === '') {
+            $message = "All fields are required.";
+        } elseif (
+            strlen($password_input) < 8 ||
+            !preg_match('/[A-Z]/', $password_input) ||
+            !preg_match('/[0-9]/', $password_input)
+        ) {
+            $message = "Password must be at least 8 characters, include a number and uppercase letter.";
+        } elseif (!preg_match('/^\+639\d{9}$/', $phone)) {
+            $message = "Invalid Philippine mobile number format.";
+        } else {
 
-        try {
-            $pdo->beginTransaction();
+            $password = password_hash($password_input, PASSWORD_DEFAULT);
 
-            // Insert user
-            $stmt = $pdo->prepare("
-                INSERT INTO users (full_name, address, email, phone, password, role_id)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$full_name, $address, $email, $phone, $password, $customerRoleId]);
-            $user_id = $pdo->lastInsertId();
+            try {
 
-            // Insert customer
-            $stmt2 = $pdo->prepare("
-                INSERT INTO customers (user_id, area_id, meter_number)
-                VALUES (?, ?, ?)
-            ");
-            $stmt2->execute([$user_id, $area_id, $meter_number]);
+                $pdo->beginTransaction();
 
-            // Insert contact preferences (MOVE IT HERE)
-            $stmt3 = $pdo->prepare("
-                INSERT INTO user_contact_preferences (user_id)
-                VALUES (?)
-            ");
-            $stmt3->execute([$user_id]);
+                $stmt = $pdo->prepare("
+                    INSERT INTO users (full_name, address, email, phone, password, role_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ");
 
-            $pdo->commit();
+                $stmt->execute([$full_name, $address, $email, $phone, $password, $customerRoleId]);
 
-            $success = true;
-            $message = "Customer registered successfully!";
+                $user_id = $pdo->lastInsertId();
 
-        } catch (Exception $e) {
+                $stmt2 = $pdo->prepare("
+                    INSERT INTO customers (user_id, area_id, meter_number)
+                    VALUES (?, ?, ?)
+                ");
+                $stmt2->execute([$user_id, $area_id, $meter_number]);
 
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+                $stmt3 = $pdo->prepare("
+                    INSERT INTO user_contact_preferences (user_id)
+                    VALUES (?)
+                ");
+                $stmt3->execute([$user_id]);
+
+                $pdo->commit();
+
+                $success = true;
+                $message = "Customer registered successfully!";
+
+            } catch (Exception $e) {
+
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+
+                $message = "Error registering customer: " . $e->getMessage();
             }
-
-            $message = "Error registering customer: " . $e->getMessage();
         }
     }
 }
@@ -306,11 +334,19 @@ if (isset($_POST['register'])) {
 
             <!-- Full Name -->
             <div class="mb-3">
-                <label class="form-label">Full Name</label>
+                <label class="form-label">First Name</label>
+                <div class="input-group mb-2">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text" name="first_name" class="form-control" placeholder="Juan" required>
+                </div>
+                <div id="firstNameFeedback" class="small mt-1"></div>
+
+                <label class="form-label">Last Name</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-person"></i></span>
-                    <input type="text" name="full_name" class="form-control" placeholder="Juan Dela Cruz" required>
+                    <input type="text" name="last_name" class="form-control" placeholder="Dela Cruz" required>
                 </div>
+                <div id="lastNameFeedback" class="small mt-1"></div>
             </div>
 
             <!-- Address -->
@@ -327,7 +363,12 @@ if (isset($_POST['register'])) {
                 <label class="form-label">Email</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                    <input type="email" name="email" id="email" class="form-control" placeholder="juan.delacruz@example.com" required>
+                    <input type="email"
+                        name="email"
+                        id="email"
+                        class="form-control"
+                        placeholder="example@gmail.com"
+                        required>
                 </div>
                 <div id="emailFeedback" class="small mt-1"></div>
             </div>
@@ -345,14 +386,53 @@ if (isset($_POST['register'])) {
             <!-- Password -->
             <div class="mb-3">
                 <label class="form-label">Password</label>
+
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                    <input type="password" name="password" id="password" class="form-control" placeholder="Create a strong password" required>
+
+                    <input type="password"
+                        name="password"
+                        id="password"
+                        class="form-control"
+                        placeholder="Create a strong password"
+                        required>
+
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            id="togglePassword">
+                        <i class="bi bi-eye"></i>
+                    </button>
                 </div>
+
                 <div class="progress mt-2" style="height:6px;">
                     <div id="strengthBar" class="progress-bar"></div>
                 </div>
+
                 <small id="strengthText" class="text-muted"></small>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="mb-3">
+                <label class="form-label">Confirm Password</label>
+
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+
+                    <input type="password"
+                        name="confirm_password"
+                        id="confirm_password"
+                        class="form-control"
+                        placeholder="Confirm your password"
+                        required>
+
+                    <button class="btn btn-outline-secondary"
+                            type="button"
+                            id="toggleConfirmPassword">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
+
+                <div id="confirmFeedback" class="small mt-1"></div>
             </div>
 
             <!-- Area -->
@@ -376,7 +456,11 @@ if (isset($_POST['register'])) {
                 <div id="meterFeedback" class="small mt-1"></div>
             </div>
 
-            <button type="submit" name="register" class="btn-register w-100">
+            <button type="submit"
+                    name="register"
+                    id="registerBtn"
+                    class="btn-register w-100"
+                    disabled>
                 Create Account
             </button>
 
@@ -390,27 +474,112 @@ if (isset($_POST['register'])) {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    
+    const firstName = document.querySelector('[name="first_name"]');
+    const lastName = document.querySelector('[name="last_name"]');
+
+    const firstNameFeedback = document.getElementById("firstNameFeedback");
+    const lastNameFeedback = document.getElementById("lastNameFeedback");
+
+    const nameRegex = /^[a-zA-Z\s'-]{2,50}$/;
+
+    function validateName(input, feedback){
+
+        const value = input.value.trim();
+
+        if(value === ''){
+            feedback.textContent = '';
+            input.classList.remove("is-valid","is-invalid");
+            return;
+        }
+
+        if(!nameRegex.test(value)){
+
+            feedback.textContent = "Invalid name. Letters only.";
+            feedback.className = "text-danger small";
+
+            input.classList.add("is-invalid");
+            input.classList.remove("is-valid");
+
+        }else{
+
+            feedback.textContent = "Valid name";
+            feedback.className = "text-success small";
+
+            input.classList.remove("is-invalid");
+            input.classList.add("is-valid");
+        }
+    }
+
+    firstName.addEventListener("input", () => validateName(firstName, firstNameFeedback));
+    lastName.addEventListener("input", () => validateName(lastName, lastNameFeedback));
+
+</script>
+
     <script>
         const emailInput = document.getElementById('email');
         const emailFeedback = document.getElementById('emailFeedback');
 
-        emailInput.addEventListener('blur', () => {
-            if (!emailInput.value) return;
+        let emailTimer; // debounce timer
 
-            fetch(`check_availability.php?email=${encodeURIComponent(emailInput.value)}`)
+        emailInput.addEventListener('input', () => {
+
+            const email = emailInput.value.trim();
+            const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+
+            clearTimeout(emailTimer); // stop previous timer
+
+            if(email === ''){
+                emailFeedback.textContent = '';
+                emailInput.classList.remove('is-valid','is-invalid');
+                return;
+            }
+
+            // Step 1: Gmail validation
+            if(!gmailRegex.test(email)){
+
+                emailFeedback.textContent = 'Only Gmail addresses are allowed';
+                emailFeedback.className = 'text-danger small';
+
+                emailInput.classList.add('is-invalid');
+                emailInput.classList.remove('is-valid');
+
+                return;
+            }
+
+            // Show checking message
+            emailFeedback.textContent = 'Checking email availability...';
+            emailFeedback.className = 'text-muted small';
+
+            // Step 2: Debounce database check (500ms)
+            emailTimer = setTimeout(() => {
+
+                fetch(`check_availability.php?email=${encodeURIComponent(email)}`)
                 .then(res => res.json())
                 .then(data => {
+
                     if (data.status === 'error') {
-                        emailFeedback.innerHTML = data.message;
-                        emailFeedback.className = 'text-danger';
+
+                        emailFeedback.textContent = data.message;
+                        emailFeedback.className = 'text-danger small';
+
                         emailInput.classList.add('is-invalid');
+                        emailInput.classList.remove('is-valid');
+
                     } else {
-                        emailFeedback.innerHTML = 'Email is available';
-                        emailFeedback.className = 'text-success';
+
+                        emailFeedback.textContent = 'Gmail is available';
+                        emailFeedback.className = 'text-success small';
+
                         emailInput.classList.remove('is-invalid');
                         emailInput.classList.add('is-valid');
                     }
+
                 });
+
+            }, 500);
+
         });
 
         const meterInput = document.getElementById('meter_number');
@@ -506,6 +675,71 @@ if (isset($_POST['register'])) {
                 strengthText.textContent = 'Very strong password';
             }
         });
+    </script>
+
+    <script>
+
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const confirmFeedback = document.getElementById('confirmFeedback');
+    const registerBtn = document.getElementById('registerBtn');
+
+    function checkPasswords(){
+
+        if(confirmPassword.value === ''){
+            registerBtn.disabled = true;
+            return;
+        }
+
+        if(password.value !== confirmPassword.value){
+
+            confirmFeedback.textContent = "Passwords do not match";
+            confirmFeedback.className = "text-danger small";
+
+            confirmPassword.classList.add("is-invalid");
+            confirmPassword.classList.remove("is-valid");
+
+            registerBtn.disabled = true;
+
+        }else{
+
+            confirmFeedback.textContent = "Passwords match";
+            confirmFeedback.className = "text-success small";
+
+            confirmPassword.classList.remove("is-invalid");
+            confirmPassword.classList.add("is-valid");
+
+            registerBtn.disabled = false;
+        }
+    }
+
+    password.addEventListener('input', checkPasswords);
+    confirmPassword.addEventListener('input', checkPasswords);
+
+
+    const togglePassword = document.getElementById("togglePassword");
+    const toggleConfirmPassword = document.getElementById("toggleConfirmPassword");
+
+    togglePassword.addEventListener("click", function(){
+
+        const type = password.type === "password" ? "text" : "password";
+        password.type = type;
+
+        this.innerHTML = type === "password"
+            ? '<i class="bi bi-eye"></i>'
+            : '<i class="bi bi-eye-slash"></i>';
+    });
+
+    toggleConfirmPassword.addEventListener("click", function(){
+
+        const type = confirmPassword.type === "password" ? "text" : "password";
+        confirmPassword.type = type;
+
+        this.innerHTML = type === "password"
+            ? '<i class="bi bi-eye"></i>'
+            : '<i class="bi bi-eye-slash"></i>';
+    });
+
     </script>
 
 <?php if ($success): ?>

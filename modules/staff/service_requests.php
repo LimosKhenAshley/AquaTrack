@@ -101,7 +101,6 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 <i class="bi bi-tools me-2 text-primary"></i>
                 Service Requests
             </h2>
-            <p class="text-muted mt-1">Manage and track customer service requests</p>
         </div>
         <div>
             <span class="badge bg-light text-dark p-3">

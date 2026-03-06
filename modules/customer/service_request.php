@@ -131,11 +131,10 @@ function formatDate($date) {
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="mb-1">My Service Requests</h2>
-            <p class="text-muted mb-0">Manage and track your service requests</p>
         </div>
 
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestModal">
-            <i class="bi bi-plus-circle me-2"></i>
+            <i class="bi bi-file-earmark-plus me-2"></i>
             New Request
         </button>
     </div>
@@ -408,6 +407,7 @@ function formatDate($date) {
     </div>
 </div>
 
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <!-- Live Search Script -->
 <script>
 document.getElementById('searchInput').addEventListener('keyup', function() {
