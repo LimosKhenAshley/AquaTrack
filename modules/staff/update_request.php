@@ -114,11 +114,13 @@ if($status === 'resolved'){
 ================================ */
 
 $pdo->prepare("
-    INSERT INTO audit_logs(user_id,action)
-    VALUES (?,?)
+    INSERT INTO audit_logs(user_id,action, description, ip_address)
+    VALUES (?, ?, ?, ?)
 ")->execute([
     $user_id,
-    "Updated service request #$request_id → $status"
+    "Updated service request #$request_id → $status",
+    "Service request updated by staff",
+    $_SERVER['REMOTE_ADDR']
 ]);
 
 header("Location: service_requests.php");

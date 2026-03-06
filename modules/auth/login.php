@@ -167,8 +167,11 @@ function getRoleName($pdo, $role_id) {
     
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --primary-gradient: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            --secondary-gradient: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            --primary-color: #0284c7;
+            --primary-light: #38bdf8;
+            --water-dark: #0369a1;
         }
         
         body {
@@ -355,12 +358,12 @@ function getRoleName($pdo, $role_id) {
         }
         
         .form-control:focus {
-            border-color: #667eea;
+            border-color: var(--primary-color);
             box-shadow: none;
         }
         
         .form-control:focus + .input-group-text {
-            border-color: #667eea;
+            border-color: var(--primary-color);
         }
         
         .password-toggle {
@@ -385,8 +388,8 @@ function getRoleName($pdo, $role_id) {
         }
         
         .form-check-input:checked {
-            background-color: #667eea;
-            border-color: #667eea;
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
         }
         
         .btn-login {
@@ -407,7 +410,7 @@ function getRoleName($pdo, $role_id) {
         
         .btn-login:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 10px 30px rgba(2, 132, 199, 0.4);
         }
         
         .btn-login:active {
@@ -455,7 +458,7 @@ function getRoleName($pdo, $role_id) {
         }
         
         .footer-links a:hover {
-            color: #667eea;
+            color: var(--primary-color);
         }
         
         .footer-links .divider {
@@ -472,7 +475,7 @@ function getRoleName($pdo, $role_id) {
         }
         
         .register-prompt a {
-            color: #667eea;
+            color: var(--primary-color);
             font-weight: 600;
             text-decoration: none;
             margin-left: 0.5rem;

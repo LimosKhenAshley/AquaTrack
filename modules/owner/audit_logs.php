@@ -43,7 +43,7 @@ $logs = $stmt->fetchAll();
 <tr>
     <td><?= htmlspecialchars($log['full_name'] ?? 'System') ?></td>
     <td><?= htmlspecialchars($log['action']) ?></td>
-    <td><?= htmlspecialchars($log['description']) ?></td>
+    <td><?= htmlspecialchars((string)$log['description']) ?></td>
     <td><?= $log['ip_address'] ?></td>
     <td><?= $log['created_at'] ?></td>
 </tr>

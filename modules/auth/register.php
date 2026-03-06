@@ -119,7 +119,10 @@ if (isset($_POST['register'])) {
 
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-gradient: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            --secondary-gradient: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            --primary-color: #0284c7;
+            --water-dark: #0369a1;
         }
 
         body {
@@ -219,7 +222,7 @@ if (isset($_POST['register'])) {
         }
 
         .form-control:focus, .form-select:focus {
-            border-color:#667eea;
+            border-color: var(--primary-color);
             box-shadow:none;
         }
 
@@ -247,7 +250,7 @@ if (isset($_POST['register'])) {
 
         .btn-register:hover {
             transform:translateY(-2px);
-            box-shadow:0 10px 30px rgba(102,126,234,0.4);
+            box-shadow:0 10px 30px rgba(2,132,199,0.4);
         }
 
         .alert {
@@ -262,7 +265,7 @@ if (isset($_POST['register'])) {
         }
 
         .login-link a {
-            color:#667eea;
+            color:var(--primary-color);
             font-weight:600;
             text-decoration:none;
         }
@@ -511,7 +514,7 @@ if (isset($_POST['register'])) {
         <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
 
             <!-- Gradient Top Banner -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
                         padding: 2rem;
                         text-align:center;
                         position:relative;">
@@ -548,7 +551,7 @@ if (isset($_POST['register'])) {
 
                 <a href="login.php" class="btn btn-lg w-100"
                    style="
-                       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                       background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
                        color:white;
                        font-weight:600;
                        border-radius:12px;
