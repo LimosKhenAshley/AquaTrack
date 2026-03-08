@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../app/middleware/auth.php';
-checkRole(['owner']);
+checkRole(['admin']);
 
 require_once __DIR__ . '/../../app/config/database.php';
 
@@ -33,24 +33,24 @@ $data = $stmt->fetchAll();
 ?>
 
 <table border="1">
-<tr>
-    <th>Customer</th>
-    <th>Bill Amount</th>
-    <th>Penalty</th>
-    <th>Amount Paid</th>
-    <th>Method</th>
-    <th>Payment Date</th>
-</tr>
+    <tr>
+        <th>Customer</th>
+        <th>Bill Amount</th>
+        <th>Penalty</th>
+        <th>Amount Paid</th>
+        <th>Method</th>
+        <th>Payment Date</th>
+    </tr>
 
-<?php foreach($data as $row): ?>
-<tr>
-    <td><?= $row['full_name'] ?></td>
-    <td><?= $row['amount'] ?></td>
-    <td><?= $row['penalty'] ?></td>
-    <td><?= $row['amount_paid'] ?></td>
-    <td><?= strtoupper($row['method']) ?></td>
-    <td><?= $row['payment_date'] ?></td>
-</tr>
-<?php endforeach; ?>
+    <?php foreach($data as $row): ?>
+        <tr>
+            <td><?= $row['full_name'] ?></td>
+            <td><?= $row['amount'] ?></td>
+            <td><?= $row['penalty'] ?></td>
+            <td><?= $row['amount_paid'] ?></td>
+            <td><?= strtoupper($row['method']) ?></td>
+            <td><?= $row['payment_date'] ?></td>
+        </tr>
+    <?php endforeach; ?>
 
 </table>

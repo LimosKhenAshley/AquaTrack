@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../../app/middleware/auth.php';
-checkRole(['owner']);
+checkRole(['admin']);
 
 require_once __DIR__ . '/../../app/config/database.php';
 require_once __DIR__ . '/../../app/libs/fpdf/fpdf.php';

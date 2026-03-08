@@ -64,6 +64,14 @@ if ($role === 'staff') {
                 <a href="/AquaTrack/modules/admin/service_requests.php"
                 class="nav-link <?= $currentPage === 'service_requests.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛠 Service Requests</a>
             </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/admin/reports.php" 
+                class="nav-link <?= $currentPage === 'reports.php' ? 'active bg-primary text-white' : 'text-white' ?>">📈 Reports</a>
+            </li>
+            <li class="nav-item">
+                <a href="/AquaTrack/modules/admin/audit_logs.php"
+                class="nav-link <?= $currentPage === 'audit_logs.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛡 Activity Logs</a>
+            </li>
         <?php endif; ?>
 
         <?php if ($role === 'staff'): ?>
@@ -137,14 +145,6 @@ if ($role === 'staff') {
             <li class="nav-item">
                 <a href="/AquaTrack/modules/owner/dashboard.php" 
                 class="nav-link <?= $currentPage === 'dashboard.php' ? 'active bg-primary text-white' : 'text-white' ?>">📊 Dashboard</a>
-            </li>
-            <li class="nav-item">
-                <a href="/AquaTrack/modules/owner/reports.php" 
-                class="nav-link <?= $currentPage === 'reports.php' ? 'active bg-primary text-white' : 'text-white' ?>">📈 Reports</a>
-            </li>
-            <li class="nav-item">
-                <a href="/AquaTrack/modules/owner/audit_logs.php"
-                class="nav-link <?= $currentPage === 'audit_logs.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛡 Audit Logs</a>
             </li>
         <?php endif; ?>
 

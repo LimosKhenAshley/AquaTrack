@@ -41,7 +41,7 @@ $riskCount = 0;
 try {
     $riskCount = $pdo->query("
         SELECT COUNT(*) FROM customers 
-        WHERE status='for_disconnection'
+        WHERE service_status='disconnected'
     ")->fetchColumn();
 } catch(Exception $e) {
     $riskCount = 0; // if column not present yet
@@ -180,7 +180,7 @@ try {
         <div class="col-md-6">
             <div class="card shadow border-0 bg-secondary text-white">
                 <div class="card-body">
-                    <h6>For Disconnection</h6>
+                    <h6>Disconnected Users</h6>
                     <h3><?= $riskCount ?></h3>
                 </div>
             </div>
