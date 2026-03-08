@@ -20,7 +20,7 @@ $logs = $stmt->fetchAll();
 
 <div class="container-fluid px-4 mt-4">
 
-<h3>🛡 Audit Logs</h3>
+<h3>🛡 Activity Logs</h3>
 
 <div class="card shadow-sm mt-3">
 <div class="card-body">
