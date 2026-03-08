@@ -1,0 +1,12 @@
+id,customer_id,reason,requested_by,action,status,scheduled_date,reconnection_fee,completed_date,created_at
+2,12,"Payment Not Settled",24,disconnect,completed,2026-02-19,0.00,"2026-02-18 20:42:05","2026-02-18 20:15:42"
+4,12,"Will pay Bill",24,reconnect,completed,2026-02-19,0.00,"2026-02-18 20:43:53","2026-02-18 20:43:38"
+5,12,"Payment not Settled",24,disconnect,completed,2026-02-18,0.00,"2026-02-18 20:44:58","2026-02-18 20:44:53"
+6,12,"Will Pay Remaining Balanced and Continue Using the Sevices",24,reconnect,completed,2026-02-18,0.00,"2026-02-18 20:48:17","2026-02-18 20:47:23"
+7,13,"Bill not Settled",24,disconnect,completed,2026-02-18,0.00,"2026-02-18 21:09:17","2026-02-18 21:08:28"
+9,13,"Payment will be Settled",24,reconnect,completed,2026-02-18,0.00,"2026-02-18 21:11:27","2026-02-18 21:10:35"
+10,13,"Payment Not Settled",24,disconnect,completed,2026-02-19,0.00,"2026-02-19 19:11:12","2026-02-19 19:11:05"
+11,13,"Balance Settled",24,reconnect,completed,2026-02-19,150.00,"2026-02-19 19:13:42","2026-02-19 19:12:45"
+12,12,"Balanced not Settled",24,disconnect,completed,2026-02-19,0.00,"2026-02-19 19:16:09","2026-02-19 19:15:55"
+13,12,"Balance Settled",24,reconnect,completed,2026-02-19,150.00,"2026-02-19 19:18:51","2026-02-19 19:18:46"
+14,15,"Bill not Settled",24,disconnect,completed,2026-03-02,0.00,"2026-03-02 19:05:42","2026-03-02 19:05:32"

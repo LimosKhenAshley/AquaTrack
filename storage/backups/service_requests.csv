@@ -1,0 +1,4 @@
+id,customer_id,subject,message,type,priority,status,admin_note,created_at,updated_at,assigned_staff_id,staff_notes
+1,2,"Meter Error","My Water Meter is going haywire.",meter,high,resolved,"Needs Worker to check","2026-02-13 19:44:21","2026-02-22 10:25:06",1,
+2,3,"Hose Error","I think a leak has been getting my meter haywire",leak,high,resolved,"Send a technician to check","2026-03-03 19:37:58","2026-03-05 17:29:28",1,"Technician Solved the Issue"
+3,2,"Meter Error","Meter not showing reading",meter,high,cancelled,,"2026-03-03 20:51:22","2026-03-03 20:55:12",,

@@ -1,0 +1,6 @@
+id,request_id,old_status,new_status,notes,updated_by,created_at
+1,2,open,open,,1,"2026-03-03 20:05:27"
+2,2,open,open,,1,"2026-03-03 20:06:58"
+3,2,open,in_progress,"Sending Technician Tomorrow",1,"2026-03-03 22:37:57"
+4,2,in_progress,resolved,"Technician Reseolved the Issue",1,"2026-03-05 17:23:45"
+5,2,resolved,resolved,"Technician Solved the Issue",1,"2026-03-05 17:29:28"
