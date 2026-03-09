@@ -432,3 +432,4 @@ id,user_id,action,description,ip_address,created_at
 431,6,LOGIN_SUCCESS,"User logged in: owner@aquatrack.com",::1,"2026-03-08 18:42:46"
 432,3,LOGIN_SUCCESS,"User logged in: admin@aquatrack.com",::1,"2026-03-08 18:43:02"
 433,3,LOGIN_SUCCESS,"User logged in: admin@aquatrack.com",::1,"2026-03-08 18:44:27"
+434,3,LOGIN_SUCCESS,"User logged in: admin@aquatrack.com",::1,"2026-03-09 20:40:18"

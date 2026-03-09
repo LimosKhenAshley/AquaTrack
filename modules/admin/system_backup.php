@@ -12,6 +12,18 @@ $_SESSION['csrf'] = bin2hex(random_bytes(32));
 
 // Fetch backup history
 $backups = $pdo->query("SELECT * FROM backup_logs ORDER BY created_at DESC")->fetchAll();
+
+// Calculate total backup storage
+$totalBackupSize = 0;
+foreach ($backups as $b) {
+    $totalBackupSize += (int)$b['file_size'];
+}
+
+// Define storage limit (example: 500MB)
+$storageLimit = 500 * 1024 * 1024;
+
+$usagePercent = $storageLimit > 0 ? ($totalBackupSize / $storageLimit) * 100 : 0;
+$usagePercent = min($usagePercent, 100);
 ?>
 
 <div class="container-fluid px-4 mt-4">
@@ -39,7 +51,7 @@ $backups = $pdo->query("SELECT * FROM backup_logs ORDER BY created_at DESC")->fe
                     <h5 class="card-title">Create Backup</h5>
                     <p class="text-muted">Download full SQL + Excel backup</p>
                     
-                    <a href="backup_database.php" class="btn btn-success" onclick="showLoader()">
+                    <a href="backup_database.php" class="btn btn-success" id="backupBtn" onclick="startBackup(event)">
                         <i class="fas fa-download me-2"></i>Create Backup
                     </a>
                     
@@ -108,6 +120,38 @@ $backups = $pdo->query("SELECT * FROM backup_logs ORDER BY created_at DESC")->fe
         </div>
     </div>
 
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <strong>Backup Storage Usage</strong>
+                        <span>
+                            <?= formatFileSize($totalBackupSize) ?> / 
+                            <?= formatFileSize($storageLimit) ?>
+                        </span>
+                    </div>
+
+                    <div class="progress" style="height:20px;">
+                        <div 
+                            class="progress-bar 
+                            <?= $usagePercent > 80 ? 'bg-danger' : ($usagePercent > 60 ? 'bg-warning' : 'bg-success') ?>"
+                            role="progressbar"
+                            style="width: <?= $usagePercent ?>%;">
+                            <?= round($usagePercent) ?>%
+                        </div>
+                    </div>
+
+                    <small class="text-muted">
+                        Storage used by database backups
+                    </small>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Backup History Section -->
     <?php if (!empty($backups)): ?>
     <div class="row mt-5">
@@ -147,8 +191,19 @@ $backups = $pdo->query("SELECT * FROM backup_logs ORDER BY created_at DESC")->fe
 
 <script>
 // Show loader function
-function showLoader() {
-    document.getElementById("backupLoader").style.display = "block";
+function startBackup(e) {
+
+    const loader = document.getElementById("backupLoader");
+    const btn = document.getElementById("backupBtn");
+
+    loader.style.display = "block";
+    btn.classList.add("disabled");
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating Backup...';
+
+    // allow download to start normally
+    setTimeout(() => {
+        location.reload();
+    }, 4000); // refresh page after backup starts
 }
 
 // Backup file preview
