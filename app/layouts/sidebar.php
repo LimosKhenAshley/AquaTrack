@@ -69,8 +69,8 @@ if ($role === 'staff') {
                 class="nav-link <?= $currentPage === 'reports.php' ? 'active bg-primary text-white' : 'text-white' ?>">📈 Reports</a>
             </li>
             <li class="nav-item">
-                <a href="/AquaTrack/modules/admin/audit_logs.php"
-                class="nav-link <?= $currentPage === 'audit_logs.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛡 Activity Logs</a>
+                <a href="/AquaTrack/modules/admin/activity_logs.php"
+                class="nav-link <?= $currentPage === 'activity_logs.php' ? 'active bg-primary text-white' : 'text-white' ?>">🛡 Activity Logs</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/system_backup.php"
