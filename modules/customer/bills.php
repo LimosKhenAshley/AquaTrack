@@ -91,6 +91,8 @@ $bills = $stmt->fetchAll();
                             <td>
                                 <?php if ($bill['status'] === 'paid'): ?>
                                     <span class="badge bg-success">Paid</span>
+                                <?php elseif ($bill['status'] === 'pending'): ?>
+                                    <span class="badge bg-info text-dark">Pending</span>
                                 <?php elseif (strtotime($bill['due_date']) < time()) : ?>
                                     <span class="badge bg-warning text-dark">Overdue</span>
                                 <?php else: ?>

@@ -231,6 +231,10 @@ $lastPaymentDate = $lastPay->fetchColumn();
                         <td>
                             <?php if ($bill['status'] === 'paid'): ?>
                                 <button class="btn btn-secondary btn-sm" disabled>Paid</button>
+                            <?php elseif ($bill['status'] === 'pending'): ?>
+                                <button class="btn btn-info btn-sm" disabled>
+                                    Pending Verification
+                                </button>
                             <?php elseif (strtotime($bill['due_date']) < time()) : ?>
                                 <button class="btn btn-warning btn-sm text-dark"
                                     data-bs-toggle="modal"
@@ -330,7 +334,6 @@ $lastPaymentDate = $lastPay->fetchColumn();
 
                 payBillModal.addEventListener('hidden.bs.modal', function () {
 
-                    // 🔥 Force cleanup (guaranteed fix)
                     document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                     document.body.classList.remove('modal-open');
                     document.body.style.overflow = '';
@@ -338,7 +341,7 @@ $lastPaymentDate = $lastPay->fetchColumn();
 
                     Swal.fire({
                         icon: 'success',
-                        title: 'Payment Successful',
+                        title: 'Payment Submitted',
                         text: data.message,
                         confirmButtonColor: '#198754'
                     });
@@ -350,13 +353,26 @@ $lastPaymentDate = $lastPay->fetchColumn();
                     if (btn) {
                         const row = btn.closest('tr');
                         row.cells[5].innerHTML =
-                            '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                            '<button class="btn btn-info btn-sm" disabled>Pending Verification</button>';
                     }
 
                 }, { once: true });
 
                 modalInstance.hide();
-            } else {
+            }
+
+            else if(data.status === 'cash'){
+
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Cash Payment',
+                    text: data.message,
+                    confirmButtonColor: '#0d6efd'
+                });
+
+            }
+
+            else{
                 msg.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
             }
         });

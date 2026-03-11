@@ -5,7 +5,6 @@ checkRole(['customer']);
 require_once __DIR__ . '/../../app/config/database.php';
 require_once '../../app/helpers/notify.php';
 
-
 header('Content-Type: application/json');
 
 $bill_id = $_POST['bill_id'] ?? null;
@@ -16,15 +15,16 @@ if(!$bill_id){
     exit;
 }
 
-// check if bill belongs to this customer
-$customer_id = $_SESSION['user']['id'];
+$user_id = $_SESSION['user']['id'];
+
+/* VERIFY BILL BELONGS TO CUSTOMER */
 $stmt = $pdo->prepare("
-    SELECT id, customer_id, amount, penalty FROM bills
-    WHERE id = ? AND customer_id = (
-        SELECT id FROM customers WHERE user_id = ?
-    )
+    SELECT b.id, b.customer_id, b.amount, b.penalty
+    FROM bills b
+    JOIN customers c ON b.customer_id = c.id
+    WHERE b.id = ? AND c.user_id = ?
 ");
-$stmt->execute([$bill_id, $customer_id]);
+$stmt->execute([$bill_id, $user_id]);
 $bill = $stmt->fetch();
 
 if(!$bill){
@@ -32,39 +32,64 @@ if(!$bill){
     exit;
 }
 
+$total_amount = $bill['amount'] + $bill['penalty'];
+
 try {
+
+    /* =========================
+       CASH PAYMENT
+       ========================= */
+    if($method === 'cash'){
+
+        echo json_encode([
+            'status' => 'cash',
+            'message' => 'Please proceed to the AquaTrack office to pay this bill in person.'
+        ]);
+        exit;
+    }
+
+    /* =========================
+       ONLINE / CARD PAYMENT
+       ========================= */
+
     $pdo->beginTransaction();
 
+    // record payment request
     $stmt = $pdo->prepare("
         INSERT INTO payments (bill_id, amount_paid, method)
         VALUES (?, ?, ?)
     ");
-    $total_amount = $bill['amount'] + $bill['penalty'];
-
     $stmt->execute([$bill_id, $total_amount, $method]);
 
-    // mark bill paid
-    $stmt = $pdo->prepare("UPDATE bills SET status='paid', overdue_notified = 1 WHERE id=?");
+    // change bill to pending
+    $stmt = $pdo->prepare("
+        UPDATE bills 
+        SET status='pending', overdue_notified = 1
+        WHERE id=?
+    ");
     $stmt->execute([$bill_id]);
 
     $pdo->commit();
 
-    // Get user_id
-    $userStmt = $pdo->prepare("SELECT user_id FROM customers WHERE id = ?");
+    // send notification
+    $userStmt = $pdo->prepare("SELECT user_id FROM customers WHERE id=?");
     $userStmt->execute([$bill['customer_id']]);
     $uid = $userStmt->fetchColumn();
 
     sendNotification(
         $pdo,
         $uid,
-        "Payment Received",
-        "Your payment of ₱{$total_amount} was successfully recorded.",
+        "Payment Pending",
+        "Your payment of ₱{$total_amount} is waiting for staff verification.",
         "payment"
     );
 
-    echo json_encode(['status'=>'success','message'=>'Payment successful!']);
-    exit;
-} catch (Exception $e){
+    echo json_encode([
+        'status'=>'success',
+        'message'=>'Payment submitted. Waiting for staff verification.'
+    ]);
+
+} catch(Exception $e){
     $pdo->rollBack();
     echo json_encode(['status'=>'error','message'=>'Payment failed.']);
 }

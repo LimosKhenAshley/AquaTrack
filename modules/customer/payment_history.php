@@ -30,7 +30,8 @@ $stmt = $pdo->prepare("
         p.amount_paid,
         p.method,
         p.payment_date,
-        b.id AS bill_id
+        b.id AS bill_id,
+        b.status AS bill_status
     FROM payments p
     JOIN bills b ON p.bill_id = b.id
     WHERE b.customer_id = ?
@@ -53,6 +54,7 @@ $payments = $stmt->fetchAll();
                         <tr>
                             <th>Date</th>
                             <th>Amount</th>
+                            <th>Status</th>
                             <th>Method</th>
                             <th width="120">Receipt</th>
                         </tr>
@@ -64,16 +66,41 @@ $payments = $stmt->fetchAll();
                             <td><?= date('M d, Y h:i A', strtotime($p['payment_date'])) ?></td>
                             <td>₱<?= number_format($p['amount_paid'],2) ?></td>
                             <td>
+                                <?php if($p['bill_status'] === 'paid'): ?>
+                                    <span class="badge bg-success">Paid</span>
+                                <?php elseif($p['bill_status'] === 'pending'): ?>
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary">Unpaid</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
                                 <span class="badge bg-info text-dark">
                                     <?= ucfirst($p['method']) ?>
                                 </span>
                             </td>
                             <td>
-                                <a href="../shared/receipt_pdf.php?payment_id=<?= $p['payment_id'] ?>"
-                                   class="btn btn-secondary btn-sm"
-                                   target="_blank">
-                                   Download
-                                </a>
+                                <?php if($p['bill_status'] === 'paid'): ?>
+
+                                    <a href="../shared/receipt_pdf.php?payment_id=<?= $p['payment_id'] ?>"
+                                    class="btn btn-success btn-sm"
+                                    target="_blank">
+                                    Download
+                                    </a>
+
+                                <?php elseif($p['bill_status'] === 'pending'): ?>
+
+                                    <button class="btn btn-warning btn-sm" disabled>
+                                        Pending
+                                    </button>
+
+                                <?php else: ?>
+
+                                    <button class="btn btn-secondary btn-sm" disabled>
+                                        Not Available
+                                    </button>
+
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

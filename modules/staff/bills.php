@@ -60,11 +60,13 @@ $stmt = $pdo->prepare("
         b.penalty,
         (b.amount + b.penalty) AS total_amount,
         b.status,
+        p.method AS payment_method,
         b.created_at
     FROM bills b
     JOIN customers c ON b.customer_id = c.id
     JOIN users u ON c.user_id = u.id
     JOIN readings r ON b.reading_id = r.id
+    LEFT JOIN payments p ON p.bill_id = b.id
     $where
     ORDER BY b.created_at DESC
     LIMIT :limit OFFSET :offset
@@ -126,24 +128,44 @@ $bills = $stmt->fetchAll();
                             <td>
                                 <?php if ($bill['status'] === 'paid'): ?>
                                     <span class="badge bg-success">Paid</span>
+
+                                <?php elseif ($bill['status'] === 'pending'): ?>
+                                    <span class="badge bg-warning text-dark">Pending</span>
+
                                 <?php else: ?>
                                     <span class="badge bg-danger">Unpaid</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if ($bill['status'] === 'unpaid'): ?>
+                                <?php if ($bill['status'] === 'pending'): ?>
+
+                                    <button class="btn btn-primary btn-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#verifyPaymentModal"
+                                            data-bill-id="<?= $bill['bill_id'] ?>"
+                                            data-customer="<?= htmlspecialchars($bill['full_name']) ?>"
+                                            data-amount="<?= number_format($bill['total_amount'],2) ?>">
+                                            🔎 Verify Payment
+                                    </button>
+                                <?php elseif ($bill['status'] === 'unpaid'): ?>
                                     <button class="btn btn-success btn-sm"
                                             data-bs-toggle="modal"
                                             data-bs-target="#markPaidModal"
                                             data-bill-id="<?= $bill['bill_id'] ?>"
                                             data-customer="<?= htmlspecialchars($bill['full_name']) ?>"
-                                            data-amount="<?= number_format($bill['amount'], 2) ?>">
-                                        ✔ Mark Paid
+                                            data-amount="<?= number_format($bill['total_amount'],2) ?>">
+                                            ✔ Mark Paid
                                     </button>
+                                <?php elseif ($bill['status'] === 'paid'): ?>
+
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                Paid
+                                </button>
+
                                 <?php else: ?>
-                                    <button class="btn btn-secondary btn-sm" disabled>
-                                        Paid
-                                    </button>
+
+                                <span class="text-muted">Waiting Payment</span>
+
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -201,6 +223,53 @@ $bills = $stmt->fetchAll();
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="verifyPaymentModal">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <form id="verifyPaymentForm">
+
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                <input type="hidden" name="bill_id" id="verifyBillId">
+
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Verify Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <p>
+                        Confirm payment for
+                        <strong id="verifyCustomer"></strong>
+                        Amount:
+                        <strong>₱<span id="verifyAmount"></span></strong>
+                    </p>
+
+                    <div class="mb-3">
+                        <label>Verification Result</label>
+                        <select name="result" class="form-select">
+                            <option value="approve">Approve Payment</option>
+                            <option value="reject">Reject Payment</option>
+                        </select>
+                    </div>
+
+                    <div id="verifyMessage"></div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary w-100">
+                        Confirm Verification
+                    </button>
+                </div>
+
+            </form>
+
         </div>
     </div>
 </div>
@@ -288,6 +357,54 @@ document.getElementById('markPaidForm').addEventListener('submit', function(e) {
         alert("Something went wrong.");
     });
 });
+
+const verifyModal = document.getElementById('verifyPaymentModal');
+
+verifyModal.addEventListener('show.bs.modal', event => {
+
+    const btn = event.relatedTarget;
+
+    document.getElementById('verifyBillId').value =
+        btn.dataset.billId;
+
+    document.getElementById('verifyCustomer').textContent =
+        btn.dataset.customer;
+
+    document.getElementById('verifyAmount').textContent =
+        btn.dataset.amount;
+});
+
+
+document.getElementById('verifyPaymentForm')
+.addEventListener('submit', function(e){
+
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    fetch('/AquaTrack/modules/staff/ajax_verify_payment.php',{
+        method:'POST',
+        body:formData
+    })
+    .then(res=>res.json())
+    .then(data=>{
+
+        if(data.status === 'success'){
+
+            alert("Payment verified!");
+
+            location.reload();
+
+        }else{
+
+            document.getElementById('verifyMessage').innerHTML =
+            `<div class="alert alert-danger">${data.message}</div>`;
+
+        }
+
+    });
+
+});
 </script>
 
 <script>
@@ -317,35 +434,62 @@ function fetchBills(page = 1, search = '') {
             }
 
             data.bills.forEach(bill => {
-                tableBody.innerHTML += `
-                    <tr>
-                        <td>${bill.full_name}</td>
-                        <td>${bill.meter_number}</td>
-                        <td>${bill.reading_date}</td>
-                        <td>${bill.reading_value}</td>
-                        <td>₱${parseFloat(bill.amount).toFixed(2)}</td>
-                        <td class="text-danger">₱${parseFloat(bill.penalty).toFixed(2)}</td>
-                        <td class="fw-bold">₱${parseFloat(bill.total_amount).toFixed(2)}</td>
-                        <td>
-                            ${bill.status === 'paid'
-                                ? '<span class="badge bg-success">Paid</span>'
-                                : '<span class="badge bg-danger">Unpaid</span>'}
-                        </td>
-                        <td>
-                            ${bill.status === 'unpaid'
-                                ? `<button class="btn btn-success btn-sm"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#markPaidModal"
-                                        data-bill-id="${bill.bill_id}"
-                                        data-customer="${bill.full_name}"
-                                        data-amount="${parseFloat(bill.amount).toFixed(2)}">
-                                        ✔ Mark Paid
-                                   </button>`
-                                : '<button class="btn btn-secondary btn-sm" disabled>Paid</button>'}
-                        </td>
-                    </tr>
+
+            let statusBadge = '';
+            let actionButton = '';
+
+            if (bill.status === 'paid') {
+
+                statusBadge = '<span class="badge bg-success">Paid</span>';
+                actionButton = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+
+            }
+            else if (bill.status === 'pending') {
+
+                statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
+
+                actionButton = `
+                    <button class="btn btn-primary btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#verifyPaymentModal"
+                        data-bill-id="${bill.bill_id}"
+                        data-customer="${bill.full_name}"
+                        data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
+                        🔎 Verify Payment
+                    </button>
                 `;
-            });
+
+            }
+            else if (bill.status === 'unpaid') {
+
+                statusBadge = '<span class="badge bg-danger">Unpaid</span>';
+
+                actionButton = `
+                    <button class="btn btn-success btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#markPaidModal"
+                        data-bill-id="${bill.bill_id}"
+                        data-customer="${bill.full_name}"
+                        data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
+                        ✔ Mark Paid
+                    </button>
+                `;
+            }
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td>${bill.full_name}</td>
+                    <td>${bill.meter_number}</td>
+                    <td>${bill.reading_date}</td>
+                    <td>${bill.reading_value}</td>
+                    <td>₱${parseFloat(bill.amount).toFixed(2)}</td>
+                    <td class="text-danger">₱${parseFloat(bill.penalty).toFixed(2)}</td>
+                    <td class="fw-bold">₱${parseFloat(bill.total_amount).toFixed(2)}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionButton}</td>
+                </tr>
+            `;
+        });
 
             renderPagination(data.totalPages, data.currentPage);
         });
