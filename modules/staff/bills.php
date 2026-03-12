@@ -274,6 +274,7 @@ $bills = $stmt->fetchAll();
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 const markPaidModalEl = document.getElementById('markPaidModal');
 const markPaidModal = new bootstrap.Modal(markPaidModalEl);
@@ -391,9 +392,14 @@ document.getElementById('verifyPaymentForm')
 
         if(data.status === 'success'){
 
-            alert("Payment verified!");
-
-            location.reload();
+            Swal.fire({
+                icon: 'success',
+                title: 'Payment Verified',
+                text: 'The payment has been approved and the bill is now marked as PAID.',
+                confirmButtonColor: '#198754'
+            }).then(() => {
+                location.reload();
+            });
 
         }else{
 

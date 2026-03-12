@@ -465,6 +465,12 @@ if (isset($_POST['edit_reading'])) {
     addModalForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(this);
+
+        // Loading state
+        const saveBtn = this.querySelector('button[name="add_reading"]');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Saving...`;
+
         fetch('/AquaTrack/modules/staff/ajax_add_reading.php', {
             method: 'POST',
             body: formData
@@ -472,13 +478,53 @@ if (isset($_POST['edit_reading'])) {
             const messageDiv = document.getElementById('addModalMessage');
             if(data.status === 'success'){
                 messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-                // Optionally, update the table row inline
-                const customerRow = document.querySelector(`button[data-customer-id="${formData.get('customer_id')}"]`).closest('tr');
+
+                const customerId = formData.get('customer_id');
+                const customerRow = document.querySelector(`button[data-customer-id="${customerId}"]`).closest('tr');
+
+                // Update reading value and date
                 customerRow.querySelector('td:nth-child(3)').textContent = data.reading_value;
                 customerRow.querySelector('td:nth-child(4)').textContent = data.reading_date;
+
+                // Inject Edit button if not already present
+                const actionsCell = customerRow.querySelector('td:nth-child(5)');
+                if (!actionsCell.querySelector('.btn-warning')) {
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'btn btn-warning btn-sm';
+                    editBtn.setAttribute('data-bs-toggle', 'modal');
+                    editBtn.setAttribute('data-bs-target', '#editReadingModal');
+                    editBtn.setAttribute('data-reading-id', data.reading_id);
+                    editBtn.setAttribute('data-customer-name', formData.get('customer_name') || document.getElementById('addCustomerName').value);
+                    editBtn.setAttribute('data-reading-date', data.reading_date);
+                    editBtn.setAttribute('data-reading-value', data.reading_value);
+                    editBtn.innerHTML = '✏️ Edit';
+                    actionsCell.appendChild(editBtn);
+                } else {
+                    // Update existing edit button data
+                    const existingEditBtn = actionsCell.querySelector('.btn-warning');
+                    existingEditBtn.setAttribute('data-reading-id', data.reading_id);
+                    existingEditBtn.setAttribute('data-reading-date', data.reading_date);
+                    existingEditBtn.setAttribute('data-reading-value', data.reading_value);
+                }
+
+                // Also update the Add button's last-reading data attribute
+                const addBtn = customerRow.querySelector('button[data-customer-id]');
+                addBtn.setAttribute('data-last-reading', data.reading_value);
+
+                setTimeout(() => {
+                    const modalEl = document.getElementById('addReadingModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+                    document.body.classList.remove('modal-open');
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                }, 800);
             } else {
                 messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
             }
+        }).finally(() => {
+            // Restore button
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `Save Reading & Generate Bill`;
         });
     });
 
@@ -487,6 +533,12 @@ if (isset($_POST['edit_reading'])) {
     editModalForm.addEventListener('submit', function(e) {
         e.preventDefault();
         const formData = new FormData(this);
+
+        // Loading state
+        const saveBtn = this.querySelector('button[name="edit_reading"]');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Saving...`;
+
         fetch('/AquaTrack/modules/staff/ajax_edit_reading.php', {
             method: 'POST',
             body: formData
@@ -494,13 +546,30 @@ if (isset($_POST['edit_reading'])) {
             const messageDiv = document.getElementById('editModalMessage');
             if(data.status === 'success'){
                 messageDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
-                // Update table row inline
+
                 const row = document.querySelector(`button[data-reading-id="${formData.get('reading_id')}"]`).closest('tr');
                 row.querySelector('td:nth-child(3)').textContent = data.reading_value;
                 row.querySelector('td:nth-child(4)').textContent = data.reading_date;
+
+                // Update the edit button's data attributes with new values
+                const editBtn = row.querySelector('button[data-reading-id]');
+                editBtn.setAttribute('data-reading-date', data.reading_date);
+                editBtn.setAttribute('data-reading-value', data.reading_value);
+
+                setTimeout(() => {
+                    const modalEl = document.getElementById('editReadingModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    modal.hide();
+                    document.body.classList.remove('modal-open');
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                }, 800);
             } else {
                 messageDiv.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
             }
+        }).finally(() => {
+            // Restore button
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = `Save Changes`;
         });
     });
 
@@ -676,7 +745,5 @@ if (isset($_POST['edit_reading'])) {
             });
     }
 </script>
-
-
 
 <?php require_once __DIR__ . '/../../app/layouts/footer.php'; ?>

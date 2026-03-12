@@ -7,8 +7,8 @@ require_once __DIR__ . '/../../app/helpers/audit_helper.php';
 require_once '../../app/helpers/notify.php';
 require_once '../../app/helpers/notify_channels.php';
 
-
 header('Content-Type: application/json');
+ini_set('display_errors', 0);
 
 $customer_id = $_POST['customer_id'] ?? null;
 $reading_value = $_POST['reading_value'] ?? null;
@@ -165,13 +165,6 @@ try {
         "Customer ID: $customer_id | Reading: $reading_value"
     );
 
-    echo json_encode([
-        'status' => 'success',
-        'message' => 'Meter reading and bill generated successfully',
-        'reading_value' => $reading_value,
-        'reading_date' => $reading_date
-    ]);
-
     sendUserNotifications(
         $pdo,
         $customer_id,
@@ -179,6 +172,15 @@ try {
         "Your new bill is ₱{$amount}. Due date: {$due_date}."
     );
 
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'Meter reading and bill generated successfully',
+        'reading_id' => $reading_id,
+        'reading_value' => $reading_value,
+        'reading_date' => $reading_date
+    ]);
+
+    exit;
 } catch (Exception $e) {
 
     $pdo->rollBack();
