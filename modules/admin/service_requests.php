@@ -1,21 +1,21 @@
 <?php
 require_once '../../app/middleware/auth.php';
-checkRole(['admin','staff']);
+checkRole(['admin', 'staff']);
+
 require_once '../../app/config/database.php';
 require_once '../../app/layouts/main.php';
 require_once '../../app/layouts/sidebar.php';
 
-if($_SERVER['REQUEST_METHOD']=='POST'){
-
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $assigned = $_POST['assigned_staff_id'] ?? null;
-
+    
     $pdo->prepare("
         UPDATE service_requests
-        SET status=?,
-            admin_note=?,
-            assigned_staff_id=?,
+        SET status = ?,
+            admin_note = ?,
+            assigned_staff_id = ?,
             updated_at = NOW()
-        WHERE id=?
+        WHERE id = ?
     ")->execute([
         $_POST['status'],
         $_POST['admin_note'],
@@ -50,7 +50,7 @@ $staffs = $pdo->query("
 
 <div class="container mt-4">
     <h3>🛠 Service Requests</h3>
-
+    
     <table class="table table-striped shadow-sm mt-3">
         <thead class="table-dark">
             <tr>
@@ -63,9 +63,9 @@ $staffs = $pdo->query("
                 <th>Actions</th>
             </tr>
         </thead>
-
+        
         <tbody>
-            <?php foreach($rows as $r): ?>
+            <?php foreach ($rows as $r): ?>
                 <tr>
                     <td><?= $r['created_at'] ?></td>
                     <td><?= $r['full_name'] ?></td>
@@ -84,7 +84,7 @@ $staffs = $pdo->query("
                         <span class="badge bg-<?= $color ?>"><?= $r['status'] ?></span>
                     </td>
                     <td>
-                        <?php if($r['staff_name']): ?>
+                        <?php if ($r['staff_name']): ?>
                             <span class="badge bg-secondary"><?= $r['staff_name'] ?></span>
                         <?php else: ?>
                             <span class="text-muted">Unassigned</span>
@@ -98,9 +98,12 @@ $staffs = $pdo->query("
                                 data-bs-target="#requestModal<?= $r['id'] ?>">
                             <i class="bi bi-pencil-square"></i> Update
                         </button>
-
+                        
                         <!-- Modal -->
-                        <div class="modal fade" id="requestModal<?= $r['id'] ?>" tabindex="-1" aria-labelledby="modalLabel<?= $r['id'] ?>" aria-hidden="true">
+                        <div class="modal fade" id="requestModal<?= $r['id'] ?>" 
+                             tabindex="-1" 
+                             aria-labelledby="modalLabel<?= $r['id'] ?>" 
+                             aria-hidden="true">
                             <div class="modal-dialog">
                                 <div class="modal-content">
                                     <form method="post">
@@ -137,41 +140,41 @@ $staffs = $pdo->query("
                                                     </div>
                                                 </div>
                                             </div>
-
+                                            
                                             <div class="mb-3">
                                                 <label class="form-label">Status</label>
                                                 <select name="status" class="form-select">
-                                                    <option <?= $r['status']=='open'?'selected':'' ?> value="open">Open</option>
-                                                    <option <?= $r['status']=='in_progress'?'selected':'' ?> value="in_progress">In Progress</option>
-                                                    <option <?= $r['status']=='resolved'?'selected':'' ?> value="resolved">Resolved</option>
-                                                    <option <?= $r['status']=='rejected'?'selected':'' ?> value="rejected">Rejected</option>
+                                                    <option <?= $r['status'] == 'open' ? 'selected' : '' ?> value="open">Open</option>
+                                                    <option <?= $r['status'] == 'in_progress' ? 'selected' : '' ?> value="in_progress">In Progress</option>
+                                                    <option <?= $r['status'] == 'resolved' ? 'selected' : '' ?> value="resolved">Resolved</option>
+                                                    <option <?= $r['status'] == 'rejected' ? 'selected' : '' ?> value="rejected">Rejected</option>
                                                 </select>
                                             </div>
-
-                                            <?php if($_SESSION['user']['role']=='admin'): ?>
+                                            
+                                            <?php if ($_SESSION['user']['role'] == 'admin'): ?>
                                                 <div class="mb-3">
                                                     <label class="form-label">Assign Staff</label>
                                                     <select name="assigned_staff_id" class="form-select">
                                                         <option value="">-- Select staff to assign --</option>
-                                                        <?php foreach($staffs as $s): ?>
+                                                        <?php foreach ($staffs as $s): ?>
                                                             <option value="<?= $s['id'] ?>"
-                                                                <?= $r['assigned_staff_id']==$s['id']?'selected':'' ?>>
+                                                                <?= $r['assigned_staff_id'] == $s['id'] ? 'selected' : '' ?>>
                                                                 <?= $s['full_name'] ?>
                                                             </option>
-                                                        <?php endforeach ?>
+                                                        <?php endforeach; ?>
                                                     </select>
                                                 </div>
                                             <?php endif; ?>
-
+                                            
                                             <div class="mb-3">
                                                 <label class="form-label">Admin Note</label>
                                                 <textarea name="admin_note" 
-                                                    class="form-control" 
-                                                    rows="3"
-                                                    placeholder="Add any administrative notes or comments..."><?= htmlspecialchars((string) $r['admin_note']) ?></textarea>
+                                                          class="form-control" 
+                                                          rows="3"
+                                                          placeholder="Add any administrative notes or comments..."><?= htmlspecialchars((string) $r['admin_note']) ?></textarea>
                                             </div>
-
-                                            <?php if(!empty($r['admin_note'])): ?>
+                                            
+                                            <?php if (!empty($r['admin_note'])): ?>
                                                 <div class="mb-3">
                                                     <label class="form-label">Current Note</label>
                                                     <div class="p-2 border rounded bg-light">
@@ -179,6 +182,13 @@ $staffs = $pdo->query("
                                                     </div>
                                                 </div>
                                             <?php endif; ?>
+
+                                            <div class="mb-3">
+                                                <label class="form-label">Staff Note</label>
+                                                <div class="p-2 border rounded bg-light">
+                                                    <?= !empty($r['staff_notes']) ? htmlspecialchars($r['staff_notes']) : '<span class="text-muted">No staff note available.</span>' ?>
+                                                </div>
+                                            </div>
                                         </div>
                                         
                                         <div class="modal-footer">
@@ -193,7 +203,7 @@ $staffs = $pdo->query("
                         </div>
                     </td>
                 </tr>
-            <?php endforeach ?>
+            <?php endforeach; ?>
         </tbody>
     </table>
 </div>

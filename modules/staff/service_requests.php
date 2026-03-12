@@ -327,6 +327,7 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                                                     data-subject="<?= htmlspecialchars($r['subject']) ?>"
                                                     data-desc="<?= htmlspecialchars($r['message'] ?? 'No description') ?>"
                                                     data-status="<?= $r['status'] ?>"
+                                                    data-note="<?= htmlspecialchars($r['admin_note'] ?? 'No admin notes available.') ?>"
                                                     title="Update Request">
                                                 <i class="bi bi-pencil-square"></i> Update
                                             </button>
@@ -425,6 +426,13 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                             </label>
                             <textarea class="form-control bg-light" id="reqDesc" rows="4" readonly></textarea>
                         </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-clock-history me-2"></i>Admin Notes
+                            </label>
+                            <textarea class="form-control bg-light" id="reqAdminNote" rows="4" readonly></textarea>
+                        </div>
                         
                         <div class="col-12">
                             <label class="form-label fw-semibold">
@@ -494,6 +502,7 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
             document.getElementById('reqSubject').value = btn.dataset.subject;
             document.getElementById('reqDesc').value = btn.dataset.desc;
             document.getElementById('reqStatus').value = btn.dataset.status;
+            document.getElementById('reqAdminNote').value = btn.dataset.note;
         });
     }
 </script>
