@@ -61,20 +61,6 @@ GROUP BY ym, label
 ORDER BY ym
 ")->fetchAll();
 
-/* =========================
-   RECENT AUDIT LOGS
-========================= */
-$logs = [];
-try {
-    $logs = $pdo->query("
-        SELECT action, description, created_at
-        FROM audit_logs
-        ORDER BY created_at DESC
-        LIMIT 5
-    ")->fetchAll();
-} catch(Exception $e) {
-    $logs = [];
-}
 ?>
 
 <div class="container mt-4">
@@ -199,33 +185,6 @@ try {
             <canvas id="revChart" height="110"></canvas>
         </div>
     </div>
-
-    <!-- =======================
-         RECENT ACTIVITY
-    ======================== -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white fw-bold">
-            📝 Recent System Activity
-        </div>
-        <div class="card-body">
-
-            <?php if(empty($logs)): ?>
-                <p class="text-muted">No audit logs yet.</p>
-            <?php else: ?>
-                <ul class="list-group">
-                    <?php foreach($logs as $l): ?>
-                    <li class="list-group-item">
-                        <b><?= htmlspecialchars($l['action']) ?></b><br>
-                        <small><?= htmlspecialchars($l['description']) ?></small><br>
-                        <small class="text-muted"><?= $l['created_at'] ?></small>
-                    </li>
-                    <?php endforeach; ?>
-                </ul>
-            <?php endif; ?>
-
-        </div>
-    </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
