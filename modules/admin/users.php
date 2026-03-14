@@ -150,13 +150,14 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>User Management – AquaTrack</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Syne:wght@700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --aqua:   #0ea5e9;
             --aqua-d: #0284c7;
-            --surface:#f0f9ff;
+            --surface:#f0f2f5;
             --border: #bae6fd;
             --text:   #0f172a;
             --muted:  #64748b;
@@ -167,19 +168,17 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         body { background: var(--surface); color: var(--text); font-family: 'DM Sans', sans-serif; }
 
-        /* ── Page Header ── */
+        /* ── Page Header (matches areas.php / rates.php style) ── */
         .page-header {
-            background: linear-gradient(135deg, var(--aqua-d) 0%, #38bdf8 100%);
-            border-radius: 16px;
-            padding: 24px 28px;
-            color: #fff;
-            margin-bottom: 24px;
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 0.75rem;
         }
-        .page-header h3 { font-family: 'Syne', sans-serif; font-size: 1.6rem; margin: 0; }
-        .page-header small { opacity: .8; font-size: .85rem; }
+        .page-header h4 { font-weight: 700; margin: 0; }
 
         /* ── Toolbar ── */
         .toolbar {
@@ -292,24 +291,27 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         /* ── Responsive ── */
         @media(max-width:576px){
-            .page-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+            .page-header { flex-wrap: wrap; }
         }
     </style>
 </head>
 <body>
 
-<div class="container-fluid px-4 py-4" style="max-width:1200px;">
-
-    <!-- ── Header ── -->
+    <!-- ── Header (consistent with areas.php / rates.php) ── -->
     <div class="page-header">
+        <i class="bi bi-people-fill fs-4 text-primary"></i>
         <div>
-            <h3>👤 User Management</h3>
-            <small><?= $totalUsers ?> total users</small>
+            <h4>User Management</h4>
+            <small class="text-muted"><?= $totalUsers ?> total users</small>
         </div>
-        <button class="btn btn-light fw-semibold px-4" data-bs-toggle="modal" data-bs-target="#addUserModal">
-            + Add User
-        </button>
+        <div class="ms-auto">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="bi bi-plus-lg me-1"></i>Add User
+            </button>
+        </div>
     </div>
+
+<div class="container-fluid px-4 pb-5" style="max-width:1200px;">
 
     <!-- ── Flash message ── -->
     <?php if ($message): ?>
@@ -401,7 +403,6 @@ $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php endif; ?>
 
             <?php
-            // Show window of pages
             $start = max(1, $page - 2);
             $end   = min($totalPages, $page + 2);
             if ($start > 1)           echo '<li class="page-item disabled"><span class="page-link">…</span></li>';
@@ -602,7 +603,7 @@ function formatPHPhone(raw) {
     if (v.startsWith('09') && v.length === 11) return '+63' + v.slice(1);
     if (/^9\d{9}$/.test(v))                    return '+63' + v;
     if (/^\+639\d{9}$/.test(v))                return v;
-    return null; // invalid
+    return null;
 }
 
 function roleBadge(roleName) {
@@ -647,18 +648,16 @@ document.querySelectorAll('.toggle-pw').forEach(btn => {
 });
 
 /* ================================================================
-   LIVE SEARCH  (debounced, no full page reload)
+   LIVE SEARCH  (debounced)
 ================================================================ */
 let searchTimer;
 const searchInput   = document.getElementById('liveSearch');
 const searchSpinner = document.getElementById('searchSpinner');
 
-// State mirrored from PHP
 let currentLimit = <?= $limit ?>;
 let currentSort  = '<?= $sortCol ?>';
 let currentDir   = '<?= $sortDir ?>';
 
-// Show-entries handler — reload page (server-side pagination recalc needed)
 document.getElementById('limitSelect').addEventListener('change', function () {
     currentLimit = this.value;
     const url = new URL(window.location.href);
@@ -698,7 +697,7 @@ searchInput.addEventListener('input', function () {
 });
 
 /* ================================================================
-   BUILD A TABLE ROW FROM JS (mirrors PHP renderUserRow)
+   BUILD A TABLE ROW FROM JS
 ================================================================ */
 const currentUserId = <?= (int)($_SESSION['user_id'] ?? 0) ?>;
 
@@ -732,7 +731,7 @@ function escHtml(s)  { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;
 function escAttr(s)  { return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 /* ================================================================
-   ATTACH ROW EVENTS (called after DOM updates)
+   ATTACH ROW EVENTS
 ================================================================ */
 function attachRowEvents() {
     document.querySelectorAll('.editBtn').forEach(btn => {
@@ -787,11 +786,10 @@ function attachRowEvents() {
     });
 }
 
-// Initial attach on page load
 attachRowEvents();
 
 /* ================================================================
-   SAVE (EDIT) USER — AJAX, no page reload
+   SAVE (EDIT) USER — AJAX
 ================================================================ */
 document.getElementById('saveUserBtn').addEventListener('click', function () {
     const id       = document.getElementById('edit_id').value;
@@ -806,8 +804,7 @@ document.getElementById('saveUserBtn').addEventListener('click', function () {
     }
     errorBox.classList.add('d-none');
 
-    // Spinner
-    const saveTxt = document.getElementById('saveBtnText');
+    const saveTxt  = document.getElementById('saveBtnText');
     const saveSpin = document.getElementById('saveBtnSpinner');
     saveTxt.textContent = 'Saving…';
     saveSpin.classList.remove('d-none');
@@ -837,7 +834,6 @@ document.getElementById('saveUserBtn').addEventListener('click', function () {
             const modalEl = document.getElementById('editUserModal');
             const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
             modalInstance.hide();
-            // Force backdrop removal in case Bootstrap leaves it behind
             modalEl.addEventListener('hidden.bs.modal', function onHidden() {
                 document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                 document.body.classList.remove('modal-open');
@@ -847,7 +843,6 @@ document.getElementById('saveUserBtn').addEventListener('click', function () {
             }, { once: true });
             showToast('User updated successfully.', 'success');
 
-            // Update the row in-place without page reload
             const row = document.querySelector(`tr[data-id="${id}"]`);
             if (row) {
                 row.children[1].textContent = name;
@@ -858,7 +853,6 @@ document.getElementById('saveUserBtn').addEventListener('click', function () {
                 const roleName   = roleSelect.options[roleSelect.selectedIndex].textContent.toLowerCase().trim();
                 row.children[4].innerHTML = roleBadge(roleName);
 
-                // Update data attributes on the edit button
                 const editBtn = row.querySelector('.editBtn');
                 if (editBtn) {
                     editBtn.dataset.name    = name;
@@ -886,7 +880,7 @@ document.getElementById('saveUserBtn').addEventListener('click', function () {
 });
 
 /* ================================================================
-   ADD FORM — client-side validation before submit
+   ADD FORM — client-side validation
 ================================================================ */
 document.getElementById('addUserForm').addEventListener('submit', function (e) {
     const phone = document.getElementById('addPhone');
@@ -911,9 +905,6 @@ document.getElementById('addUserForm').addEventListener('submit', function (e) {
 </html>
 
 <?php
-/* ─────────────────────────────────────────────
-   Helper: render one <tr> in PHP (used on initial load)
-───────────────────────────────────────────── */
 function renderUserRow(array $u, int $currentUserId): string {
     $roleColors = [
         'admin'    => 'role-admin',
