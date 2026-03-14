@@ -67,8 +67,19 @@ function createServiceRequest($pdo, $customer_id, $data) {
         sanitizeInput($data['subject']),
         sanitizeInput($data['message']),
         $data['type'],
-        $data['priority']
+        getAutoPriority($data['type'])  // ← auto-assigned, not from $_POST
     ]);
+}
+
+function getAutoPriority($type) {
+    $map = [
+        'leak'       => 'high',
+        'connection' => 'high',
+        'meter'      => 'normal',
+        'billing'    => 'low',
+        'other'      => 'normal',
+    ];
+    return $map[$type] ?? 'normal';
 }
 
 function cancelServiceRequest($pdo, $request_id, $customer_id) {
@@ -130,7 +141,7 @@ function formatDate($date) {
     <!-- Header Section -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1">My Service Requests</h2>
+            <h2 class="mb-1">🛠️My Service Requests</h2>
         </div>
 
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestModal">
@@ -363,27 +374,16 @@ function formatDate($date) {
                         >
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Type</label>
-                            <select name="type" class="form-select" required>
-                                <option value="">Select type...</option>
-                                <option value="billing">Billing</option>
-                                <option value="meter">Meter Issue</option>
-                                <option value="leak">Leak Report</option>
-                                <option value="connection">Connection</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Priority</label>
-                            <select name="priority" class="form-select" required>
-                                <option value="low">Low</option>
-                                <option value="normal" selected>Normal</option>
-                                <option value="high">High</option>
-                            </select>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select name="type" class="form-select" required>
+                            <option value="">Select type...</option>
+                            <option value="billing">Billing</option>
+                            <option value="meter">Meter Issue</option>
+                            <option value="leak">Leak Report</option>
+                            <option value="connection">Connection</option>
+                            <option value="other">Other</option>
+                        </select>
                     </div>
 
                     <div class="mb-3">
