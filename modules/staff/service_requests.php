@@ -263,12 +263,17 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                         <?php else: ?>
                             <?php foreach ($rows as $r): 
                                 $hours = floor((time() - strtotime($r['created_at'])) / 3600);
-                                $overdue = $hours > 24 && $r['status'] != 'resolved';
-                                $priorityClass = match($r['priority']) {
-                                    'high' => 'danger',
-                                    'medium' => 'warning',
-                                    default => 'secondary'
+                                /* SLA limit depending on priority */
+                                $slaLimit = match($r['priority']) {
+                                    'high' => 4,
+                                    'medium' => 12,
+                                    default => 24
                                 };
+
+                                $overdue = $hours > $slaLimit && $r['status'] != 'resolved';
+                                $remaining = $slaLimit - $hours;
+                                $deadline = date("M d, Y H:i", strtotime($r['created_at']) + ($slaLimit * 3600));
+                                $priorityClass = match($r['priority']) { 'high' => 'danger', 'medium' => 'warning', default => 'secondary' };
                                 $statusClass = match($r['status']) {
                                     'resolved' => 'success',
                                     'in_progress' => 'info',
@@ -278,6 +283,11 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                                 };
                             ?>
                                 <tr class="<?= $overdue ? 'table-danger' : '' ?>">
+                                    <?php if ($overdue): ?>
+                                    <span class="badge bg-danger ms-2">
+                                        ⚠ SLA Breach
+                                    </span>
+                                    <?php endif; ?>
                                     <td class="px-4 fw-semibold">#<?= $r['id'] ?></td>
                                     <td>
                                         <div class="d-flex align-items-center">
@@ -299,14 +309,22 @@ $metrics = $metricStmt->fetchAll(PDO::FETCH_KEY_PAIR);
                                         </span>
                                     </td>
                                     <td>
-                                        <div class="d-flex align-items-center">
-                                            <span class="<?= $overdue ? 'text-danger fw-bold' : '' ?>">
-                                                <?= $hours ?> hrs
+                                        <?php if ($r['status'] == 'resolved'): ?>
+                                            <span class="text-success fw-bold">Resolved</span>
+
+                                        <?php elseif ($overdue): ?>
+                                            <span class="text-danger fw-bold">
+                                                Overdue (<?= $hours - $slaLimit ?> hrs)
                                             </span>
-                                            <?php if ($overdue): ?>
-                                                <span class="badge bg-danger ms-2" title="Overdue">⚠</span>
-                                            <?php endif; ?>
-                                        </div>
+
+                                        <?php else: ?>
+                                            <span class="text-warning fw-semibold">
+                                                <?= $remaining ?> hrs remaining
+                                            </span>
+                                        <?php endif; ?>
+                                        <small class="text-muted">
+                                            Due: <?= $deadline ?>
+                                        </small>
                                     </td>
                                     <td class="text-end px-4">
                                         <div class="d-flex gap-2 justify-content-end">
