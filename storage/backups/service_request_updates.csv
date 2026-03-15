@@ -4,3 +4,4 @@ id,request_id,old_status,new_status,notes,updated_by,created_at
 3,2,open,in_progress,"Sending Technician Tomorrow",1,"2026-03-03 22:37:57"
 4,2,in_progress,resolved,"Technician Reseolved the Issue",1,"2026-03-05 17:23:45"
 5,2,resolved,resolved,"Technician Solved the Issue",1,"2026-03-05 17:29:28"
+6,4,open,resolved,"Mali ang nasinding Metro",1,"2026-03-11 12:23:05"

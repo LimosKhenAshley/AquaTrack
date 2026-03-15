@@ -10,3 +10,4 @@ id,customer_id,reason,requested_by,action,status,scheduled_date,reconnection_fee
 12,12,"Balanced not Settled",24,disconnect,completed,2026-02-19,0.00,"2026-02-19 19:16:09","2026-02-19 19:15:55"
 13,12,"Balance Settled",24,reconnect,completed,2026-02-19,150.00,"2026-02-19 19:18:51","2026-02-19 19:18:46"
 14,15,"Bill not Settled",24,disconnect,completed,2026-03-02,0.00,"2026-03-02 19:05:42","2026-03-02 19:05:32"
+15,15,"Payment Settled",24,reconnect,completed,2026-03-12,150.00,"2026-03-11 19:32:07","2026-03-11 19:27:23"

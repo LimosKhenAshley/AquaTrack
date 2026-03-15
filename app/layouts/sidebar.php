@@ -155,11 +155,78 @@ if ($role === 'staff') {
         <hr class="text-secondary">
 
         <!-- Logout Link place on the bottom of the sidebar -->
-        <a href="/AquaTrack/modules/auth/logout.php"
-        class="nav-link text-danger fw-bold"
-        onclick="return confirm('Logout from AquaTrack?')">
-        🚪 Logout
+        <!-- SweetAlert2 CDN — add to your main layout <head> if not already there -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+        <a href="#" id="logoutBtn" class="nav-link text-danger fw-bold">
+            🚪 Logout
         </a>
+
+        <!-- Spinner overlay shown while logging out -->
+        <div id="logoutOverlay" style="display:none; position:fixed; inset:0; background:rgba(255,255,255,0.75);
+            backdrop-filter:blur(4px); z-index:9999; flex-direction:column;
+            align-items:center; justify-content:center; gap:1rem;">
+            <div style="width:48px; height:48px; border:4px solid #e0e0e0;
+                        border-top-color:#dc3545; border-radius:50%;
+                        animation:spin .75s linear infinite;"></div>
+            <p style="font-family:system-ui; color:#555; margin:0;">Signing you out…</p>
+        </div>
+        <style>@keyframes spin { to { transform:rotate(360deg); } }</style>
+
+        <script>
+            document.getElementById('logoutBtn').addEventListener('click', function (e) {
+                e.preventDefault();
+
+                Swal.fire({
+                    title: 'Log out?',
+                    text: 'You will be signed out of AquaTrack.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, log me out',
+                    cancelButtonText: 'Stay logged in',
+                    confirmButtonColor: '#dc3545',
+                    cancelButtonColor: '#6c757d',
+                    reverseButtons: true,
+                    focusCancel: true,
+                }).then(function (result) {
+                    if (!result.isConfirmed) return;
+
+                    // Show spinner
+                    var overlay = document.getElementById('logoutOverlay');
+                    overlay.style.display = 'flex';
+
+                    fetch('/AquaTrack/modules/auth/logout.php', {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            Swal.fire({
+                                toast: true,
+                                position: 'top-end',
+                                icon: 'success',
+                                title: 'Logged out successfully',
+                                showConfirmButton: false,
+                                timer: 1500,
+                                timerProgressBar: true,
+                            }).then(function () {
+                                window.location.href = data.redirect || '/AquaTrack/modules/auth/login.php';
+                            });
+                        } else {
+                            overlay.style.display = 'none';
+                            Swal.fire('Error', 'Something went wrong. Please try again.', 'error');
+                        }
+                    })
+                    .catch(function () {
+                        overlay.style.display = 'none';
+                        Swal.fire('Network Error', 'Could not reach the server.', 'error');
+                    });
+                });
+            });
+        </script>
 
     </ul>
 </div>

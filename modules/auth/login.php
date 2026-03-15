@@ -559,11 +559,11 @@ function getRoleName($pdo, $role_id) {
                 </button>
 
                 <div class="footer-links">
-                    <a href="#" data-bs-toggle="tooltip" title="Get help">
+                    <a href="need_help.php">
                         <i class="bi bi-headset"></i> Need Help?
                     </a>
                     <span class="divider">|</span>
-                    <a href="#" data-bs-toggle="tooltip" title="Privacy policy">
+                    <a href="privacy.php">
                         <i class="bi bi-shield-check"></i> Privacy
                     </a>
                 </div>
@@ -571,7 +571,7 @@ function getRoleName($pdo, $role_id) {
                 <div class="register-prompt">
                     Don't have an account?
                     <a href="register.php">
-                        Create one now <i class="bi bi-arrow-right"></i>
+                        Register <i class="bi bi-arrow-right"></i>
                     </a>
                 </div>
             </form>
