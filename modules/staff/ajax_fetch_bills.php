@@ -2,20 +2,25 @@
 require_once __DIR__ . '/../../app/config/database.php';
 
 $search = trim($_GET['search'] ?? '');
+$status = trim($_GET['status'] ?? '');  // ← new
 $page   = max(1, (int)($_GET['page'] ?? 1));
 $limit  = 10;
 $offset = ($page - 1) * $limit;
 
-$where = "";
-$params = [];
+$conditions = [];
+$params     = [];
 
 if (!empty($search)) {
-    $where = "WHERE 
-        u.full_name LIKE :search 
-        OR c.meter_number LIKE :search
-        OR b.status LIKE :search";
+    $conditions[] = "(u.full_name LIKE :search OR c.meter_number LIKE :search OR b.status LIKE :search)";
     $params[':search'] = "%$search%";
 }
+
+if (!empty($status)) {
+    $conditions[] = "b.status = :status";
+    $params[':status'] = $status;
+}
+
+$where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
 /* COUNT */
 $countStmt = $pdo->prepare("
@@ -28,7 +33,7 @@ $countStmt = $pdo->prepare("
 ");
 $countStmt->execute($params);
 $totalRecords = $countStmt->fetchColumn();
-$totalPages   = ceil($totalRecords / $limit);
+$totalPages   = (int)ceil($totalRecords / $limit);
 
 /* FETCH DATA */
 $stmt = $pdo->prepare("
@@ -62,7 +67,7 @@ $stmt->execute();
 $bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 echo json_encode([
-    'bills' => $bills,
-    'totalPages' => $totalPages,
+    'bills'       => $bills,
+    'totalPages'  => $totalPages,
     'currentPage' => $page
 ]);

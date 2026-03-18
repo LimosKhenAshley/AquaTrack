@@ -300,7 +300,7 @@ $lastPaymentDate = $lastPay->fetchColumn();
                 </div>
 
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-success w-100">Confirm Payment</button>
+                    <button type="submit" class="btn btn-success w-100" id="confirmPayBtn">Confirm Payment</button>
                 </div>
             </form>
         </div>
@@ -320,6 +320,14 @@ $lastPaymentDate = $lastPay->fetchColumn();
         e.preventDefault();
         const formData = new FormData(this);
 
+        // Loading state
+        const confirmBtn = document.getElementById('confirmPayBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Processing...
+        `;
+
         fetch('/AquaTrack/modules/customer/ajax_pay_bill.php', {
             method: 'POST',
             body: formData
@@ -328,12 +336,14 @@ $lastPaymentDate = $lastPay->fetchColumn();
         .then(data => {
             const msg = document.getElementById('payBillMessage');
 
-            if (data.status === 'success') {
+            // Reset button state
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Confirm Payment';
 
+            if (data.status === 'success') {
                 const modalInstance = bootstrap.Modal.getInstance(payBillModal);
 
                 payBillModal.addEventListener('hidden.bs.modal', function () {
-
                     document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
                     document.body.classList.remove('modal-open');
                     document.body.style.overflow = '';
@@ -361,61 +371,66 @@ $lastPaymentDate = $lastPay->fetchColumn();
                 modalInstance.hide();
             }
 
-            else if(data.status === 'cash'){
-
+            else if (data.status === 'cash') {
                 Swal.fire({
                     icon: 'info',
                     title: 'Cash Payment',
                     text: data.message,
                     confirmButtonColor: '#0d6efd'
                 });
-
             }
 
-            else{
+            else {
                 msg.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
             }
+        })
+        .catch(() => {
+            // Reset on network error too
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Confirm Payment';
+            document.getElementById('payBillMessage').innerHTML =
+                `<div class="alert alert-danger">Something went wrong. Please try again.</div>`;
         });
     });
-</script>
+    </script>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-const ctx = document.getElementById('usageChart');
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+    const ctx = document.getElementById('usageChart');
 
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?= json_encode($months) ?>,
-        datasets: [{
-            label: 'Water Usage (m³)',
-            data: <?= json_encode($usages) ?>,
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: true
-            }
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: <?= json_encode($months) ?>,
+            datasets: [{
+                label: 'Water Usage (m³)',
+                data: <?= json_encode($usages) ?>,
+                borderWidth: 2,
+                tension: 0.4,
+                fill: true
+            }]
         },
-        scales: {
-            y: {
-                beginAtZero: true,
-                title: {
-                    display: true,
-                    text: 'Cubic Meters (m³)'
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Cubic Meters (m³)'
+                    }
                 }
             }
         }
-    }
-});
+    });
 </script>
 
 <?php require_once __DIR__ . '/../../app/layouts/footer.php'; ?>

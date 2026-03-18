@@ -5,36 +5,37 @@ checkRole(['staff']);
 require_once '../../app/config/database.php';
 require_once '../../app/helpers/notify.php';
 
-$bill_id = $_POST['bill_id'] ?? null;
-$result = $_POST['result'] ?? null;
+header('Content-Type: application/json');
 
-if(!$bill_id){
-    echo json_encode([
-        'status'=>'error',
-        'message'=>'Bill ID missing'
-    ]);
+$bill_id = $_POST['bill_id'] ?? null;
+$result  = $_POST['result']  ?? null;
+
+if (!$bill_id) {
+    echo json_encode(['status' => 'error', 'message' => 'Bill ID missing']);
     exit;
 }
 
-if($result === 'approve'){
+if ($result === 'approve') {
 
     $pdo->prepare("
-        UPDATE bills
-        SET status='paid'
-        WHERE id=?
+        UPDATE bills SET status = 'paid' WHERE id = ?
     ")->execute([$bill_id]);
 
-}else{
+} else {
 
+    // Reset bill back to unpaid
     $pdo->prepare("
-        UPDATE bills
-        SET status='unpaid'
-        WHERE id=?
+        UPDATE bills SET status = 'unpaid' WHERE id = ?
+    ")->execute([$bill_id]);
+
+    // Delete the pending payment record so it doesn't linger
+    $pdo->prepare("
+        DELETE FROM payments WHERE bill_id = ? 
     ")->execute([$bill_id]);
 
 }
 
-//send notification to customer
+// Send notification to customer
 $stmt = $pdo->prepare("
     SELECT c.user_id, b.amount, b.penalty
     FROM bills b
@@ -43,16 +44,18 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$bill_id]);
 $bill = $stmt->fetch();
-if($bill){
-    $user_id = $bill['user_id'];
+
+if ($bill) {
+    $user_id      = $bill['user_id'];
     $total_amount = $bill['amount'] + $bill['penalty'];
 
-    if($result === 'approve'){
-        sendNotification($pdo, $user_id, "Payment Approved", "Your payment of ₱".number_format($total_amount,2)." has been verified. Thank you!");
-    }else{
-        sendNotification($pdo, $user_id, "Payment Rejected", "Your payment of ₱".number_format($total_amount,2)." was rejected. Please contact support for assistance.");
+    if ($result === 'approve') {
+        sendNotification($pdo, $user_id, "Payment Approved",
+            "Your payment of ₱" . number_format($total_amount, 2) . " has been verified. Thank you!");
+    } else {
+        sendNotification($pdo, $user_id, "Payment Rejected",
+            "Your payment of ₱" . number_format($total_amount, 2) . " was rejected. Please contact support for assistance.");
     }
 }
-echo json_encode([
-    'status'=>'success'
-]);
+
+echo json_encode(['status' => 'success', 'result' => $result]);  // ← pass result back to frontend

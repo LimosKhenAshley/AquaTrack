@@ -95,6 +95,14 @@ $bills = $stmt->fetchAll();
                         class="form-control"
                         placeholder="Search customer, meter #, status...">
                 </div>
+                <div class="col-md-3">
+                    <select id="statusFilter" class="form-select">
+                        <option value="">All Statuses</option>
+                        <option value="unpaid">Unpaid</option>
+                        <option value="pending">Pending</option>
+                        <option value="paid">Paid</option>
+                    </select>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-bordered table-hover align-middle">
@@ -276,28 +284,25 @@ $bills = $stmt->fetchAll();
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+// ── Mark Paid Modal ──────────────────────────────────────────────
 const markPaidModalEl = document.getElementById('markPaidModal');
-const markPaidModal = new bootstrap.Modal(markPaidModalEl);
+const markPaidModal   = new bootstrap.Modal(markPaidModalEl);
 
 markPaidModalEl.addEventListener('show.bs.modal', event => {
     const button = event.relatedTarget;
-
-    document.getElementById('markPaidBillId').value =
-        button.getAttribute('data-bill-id');
-
-    document.getElementById('markPaidCustomer').textContent =
-        button.getAttribute('data-customer');
-
-    document.getElementById('markPaidAmount').textContent =
-        button.getAttribute('data-amount');
-
-    document.getElementById('markPaidMessage').innerHTML = '';
+    document.getElementById('markPaidBillId').value        = button.getAttribute('data-bill-id');
+    document.getElementById('markPaidCustomer').textContent = button.getAttribute('data-customer');
+    document.getElementById('markPaidAmount').textContent   = button.getAttribute('data-amount');
+    document.getElementById('markPaidMessage').innerHTML    = '';
 });
 
 document.getElementById('markPaidForm').addEventListener('submit', function(e) {
     e.preventDefault();
-
     const formData = new FormData(this);
+
+    const confirmBtn = this.querySelector('[type="submit"]');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...`;
 
     fetch('/AquaTrack/modules/staff/ajax_mark_paid.php', {
         method: 'POST',
@@ -305,197 +310,169 @@ document.getElementById('markPaidForm').addEventListener('submit', function(e) {
     })
     .then(res => res.json())
     .then(data => {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '✔ Confirm Payment';
 
         if (data.status === 'success') {
-
-            // UPDATE TABLE ROW
-            const btn = document.querySelector(
-                `button[data-bill-id="${formData.get('bill_id')}"]`
-            );
-
+            const btn = document.querySelector(`button[data-bill-id="${formData.get('bill_id')}"]`);
             if (btn) {
                 const row = btn.closest('tr');
-
-                row.querySelector('td:nth-child(8)').innerHTML =
-                    '<span class="badge bg-success">Paid</span>';
-
-                row.querySelector('td:nth-child(9)').innerHTML =
-                    '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                row.querySelector('td:nth-child(8)').innerHTML = '<span class="badge bg-success">Paid</span>';
+                row.querySelector('td:nth-child(9)').innerHTML = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
             }
 
-            // FIRST close modal completely
             markPaidModal.hide();
 
-            // Wait until modal fully hidden
             markPaidModalEl.addEventListener('hidden.bs.modal', function handler() {
-
-                // Remove backdrop manually (extra safety)
                 document.body.classList.remove('modal-open');
-                document.querySelectorAll('.modal-backdrop')
-                    .forEach(el => el.remove());
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
 
-                // Open receipt AFTER modal fully closes
                 if (data.payment_id) {
-                    window.open(
-                        `/AquaTrack/modules/shared/receipt_pdf.php?payment_id=${data.payment_id}`,
-                        '_blank'
-                    );
+                    window.open(`/AquaTrack/modules/shared/receipt_pdf.php?payment_id=${data.payment_id}`, '_blank');
                 }
 
-                // Remove this event listener so it doesn't stack
                 markPaidModalEl.removeEventListener('hidden.bs.modal', handler);
-
             });
-
         } else {
             document.getElementById('markPaidMessage').innerHTML =
                 `<div class="alert alert-danger">${data.message}</div>`;
         }
-
     })
     .catch(error => {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '✔ Confirm Payment';
         console.error("Error:", error);
         alert("Something went wrong.");
     });
 });
 
-const verifyModal = document.getElementById('verifyPaymentModal');
+// ── Verify Payment Modal ─────────────────────────────────────────
+const verifyModalEl = document.getElementById('verifyPaymentModal');
 
-verifyModal.addEventListener('show.bs.modal', event => {
-
+verifyModalEl.addEventListener('show.bs.modal', event => {
     const btn = event.relatedTarget;
-
-    document.getElementById('verifyBillId').value =
-        btn.dataset.billId;
-
-    document.getElementById('verifyCustomer').textContent =
-        btn.dataset.customer;
-
-    document.getElementById('verifyAmount').textContent =
-        btn.dataset.amount;
+    document.getElementById('verifyBillId').value          = btn.dataset.billId;
+    document.getElementById('verifyCustomer').textContent  = btn.dataset.customer;
+    document.getElementById('verifyAmount').textContent    = btn.dataset.amount;
+    document.getElementById('verifyMessage').innerHTML     = '';
 });
 
-
-document.getElementById('verifyPaymentForm')
-.addEventListener('submit', function(e){
-
+document.getElementById('verifyPaymentForm').addEventListener('submit', function(e) {
     e.preventDefault();
-
     const formData = new FormData(this);
 
-    fetch('/AquaTrack/modules/staff/ajax_verify_payment.php',{
-        method:'POST',
-        body:formData
-    })
-    .then(res=>res.json())
-    .then(data=>{
+    // ← Capture this SYNCHRONOUSLY before any async call
+    const selectedResult = document.getElementById('verifyPaymentForm')
+        .querySelector('select[name="result"]').value;
 
-        if(data.status === 'success'){
+    const confirmBtn = this.querySelector('[type="submit"]');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span>Verifying...`;
+
+    fetch('/AquaTrack/modules/staff/ajax_verify_payment.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Confirm Verification';
+
+        if (data.status === 'success') {
+
+            const isApproved = selectedResult === 'approve'; // ← use captured value
 
             Swal.fire({
-                icon: 'success',
-                title: 'Payment Verified',
-                text: 'The payment has been approved and the bill is now marked as PAID.',
-                confirmButtonColor: '#198754'
-            }).then(() => {
-                location.reload();
-            });
+                icon: isApproved ? 'success' : 'warning',
+                title: isApproved ? 'Payment Approved' : 'Payment Rejected',
+                text: isApproved
+                    ? 'The payment has been approved and the bill is now marked as PAID.'
+                    : 'The payment has been rejected and the bill is back to unpaid.',
+                confirmButtonColor: isApproved ? '#198754' : '#dc3545'
+            }).then(() => location.reload());
 
-        }else{
-
+        } else {
             document.getElementById('verifyMessage').innerHTML =
-            `<div class="alert alert-danger">${data.message}</div>`;
-
+                `<div class="alert alert-danger">${data.message}</div>`;
         }
-
+    })
+    .catch(error => {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Confirm Verification';
+        console.error("Error:", error);
+        alert("Something went wrong.");
     });
-
 });
-</script>
 
-<script>
-const tableBody = document.getElementById('billingTableBody');
+// ── Live Search + Filter + Pagination ───────────────────────────
+const tableBody          = document.getElementById('billingTableBody');
 const paginationContainer = document.getElementById('paginationContainer');
-const liveSearch = document.getElementById('liveSearch');
+const liveSearch         = document.getElementById('liveSearch');
+const statusFilter       = document.getElementById('statusFilter');
 
-let currentPage = 1;
+let currentPage   = 1;
 let currentSearch = '';
+let currentStatus = '';
 
-function fetchBills(page = 1, search = '') {
-    fetch(`/AquaTrack/modules/staff/ajax_fetch_bills.php?page=${page}&search=${encodeURIComponent(search)}`)
+function fetchBills(page = 1, search = '', status = '') {
+    fetch(`/AquaTrack/modules/staff/ajax_fetch_bills.php?page=${page}&search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`)
         .then(res => res.json())
         .then(data => {
-
             tableBody.innerHTML = '';
 
             if (data.bills.length === 0) {
                 tableBody.innerHTML = `
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
-                            No bills found.
-                        </td>
+                        <td colspan="9" class="text-center text-muted py-4">No bills found.</td>
                     </tr>`;
                 paginationContainer.innerHTML = '';
                 return;
             }
 
             data.bills.forEach(bill => {
+                let statusBadge  = '';
+                let actionButton = '';
 
-            let statusBadge = '';
-            let actionButton = '';
+                if (bill.status === 'paid') {
+                    statusBadge  = '<span class="badge bg-success">Paid</span>';
+                    actionButton = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
+                } else if (bill.status === 'pending') {
+                    statusBadge  = '<span class="badge bg-warning text-dark">Pending</span>';
+                    actionButton = `
+                        <button class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#verifyPaymentModal"
+                            data-bill-id="${bill.bill_id}"
+                            data-customer="${bill.full_name}"
+                            data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
+                            🔎 Verify Payment
+                        </button>`;
+                } else if (bill.status === 'unpaid') {
+                    statusBadge  = '<span class="badge bg-danger">Unpaid</span>';
+                    actionButton = `
+                        <button class="btn btn-success btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#markPaidModal"
+                            data-bill-id="${bill.bill_id}"
+                            data-customer="${bill.full_name}"
+                            data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
+                            ✔ Mark Paid
+                        </button>`;
+                }
 
-            if (bill.status === 'paid') {
-
-                statusBadge = '<span class="badge bg-success">Paid</span>';
-                actionButton = '<button class="btn btn-secondary btn-sm" disabled>Paid</button>';
-
-            }
-            else if (bill.status === 'pending') {
-
-                statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
-
-                actionButton = `
-                    <button class="btn btn-primary btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#verifyPaymentModal"
-                        data-bill-id="${bill.bill_id}"
-                        data-customer="${bill.full_name}"
-                        data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
-                        🔎 Verify Payment
-                    </button>
-                `;
-
-            }
-            else if (bill.status === 'unpaid') {
-
-                statusBadge = '<span class="badge bg-danger">Unpaid</span>';
-
-                actionButton = `
-                    <button class="btn btn-success btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#markPaidModal"
-                        data-bill-id="${bill.bill_id}"
-                        data-customer="${bill.full_name}"
-                        data-amount="${parseFloat(bill.total_amount).toFixed(2)}">
-                        ✔ Mark Paid
-                    </button>
-                `;
-            }
-
-            tableBody.innerHTML += `
-                <tr>
-                    <td>${bill.full_name}</td>
-                    <td>${bill.meter_number}</td>
-                    <td>${bill.reading_date}</td>
-                    <td>${bill.reading_value}</td>
-                    <td>₱${parseFloat(bill.amount).toFixed(2)}</td>
-                    <td class="text-danger">₱${parseFloat(bill.penalty).toFixed(2)}</td>
-                    <td class="fw-bold">₱${parseFloat(bill.total_amount).toFixed(2)}</td>
-                    <td>${statusBadge}</td>
-                    <td>${actionButton}</td>
-                </tr>
-            `;
-        });
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${bill.full_name}</td>
+                        <td>${bill.meter_number}</td>
+                        <td>${bill.reading_date}</td>
+                        <td>${bill.reading_value}</td>
+                        <td>₱${parseFloat(bill.amount).toFixed(2)}</td>
+                        <td class="text-danger">₱${parseFloat(bill.penalty).toFixed(2)}</td>
+                        <td class="fw-bold">₱${parseFloat(bill.total_amount).toFixed(2)}</td>
+                        <td>${statusBadge}</td>
+                        <td>${actionButton}</td>
+                    </tr>`;
+            });
 
             renderPagination(data.totalPages, data.currentPage);
         });
@@ -503,37 +480,38 @@ function fetchBills(page = 1, search = '') {
 
 function renderPagination(totalPages, currentPage) {
     let html = `<ul class="pagination justify-content-center">`;
-
     for (let i = 1; i <= totalPages; i++) {
-        html += `
-            <li class="page-item ${i === currentPage ? 'active' : ''}">
-                <button class="page-link" onclick="changePage(${i})">${i}</button>
-            </li>
-        `;
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <button class="page-link" onclick="changePage(${i})">${i}</button>
+                 </li>`;
     }
-
     html += `</ul>`;
     paginationContainer.innerHTML = html;
 }
 
 function changePage(page) {
     currentPage = page;
-    fetchBills(currentPage, currentSearch);
+    fetchBills(currentPage, currentSearch, currentStatus);
 }
 
-/* Live search with debounce */
+// Debounced search
 let debounceTimer;
 liveSearch.addEventListener('keyup', function () {
     clearTimeout(debounceTimer);
-
     debounceTimer = setTimeout(() => {
         currentSearch = this.value;
-        currentPage = 1;
-        fetchBills(currentPage, currentSearch);
-    }, 400); // wait 400ms before searching
+        currentPage   = 1;
+        fetchBills(currentPage, currentSearch, currentStatus);
+    }, 400);
 });
 
-/* Initial load */
+// Instant filter on status change
+statusFilter.addEventListener('change', function () {
+    currentStatus = this.value;
+    currentPage   = 1;
+    fetchBills(currentPage, currentSearch, currentStatus);
+});
+
 fetchBills();
 </script>
 
