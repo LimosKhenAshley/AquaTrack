@@ -3,11 +3,10 @@ require_once __DIR__ . '/../../app/middleware/auth.php';
 checkRole(['admin']);
 
 require_once __DIR__ . '/../../app/config/database.php';
-require_once __DIR__ . '/../../app/layouts/main.php';
-require_once __DIR__ . '/../../app/layouts/sidebar.php';
 
 /* =========================
    CSRF TOKEN
+   Must be before any output.
 ========================= */
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (empty($_SESSION['csrf_token'])) {
@@ -30,24 +29,31 @@ function verifyCsrf(): void {
 ========================= */
 function sanitizeAreaName(string $raw): string {
     $name = trim(strip_tags($raw));
-    return mb_substr($name, 0, 100); // cap at 100 chars
+    return mb_substr($name, 0, 100);
 }
 
 $message     = '';
-$messageType = 'success'; // or 'danger'
+$messageType = 'success';
 
 /* =========================
-   DELETE AREA  (POST-based, CSRF-protected)
+   ARCHIVE AREA
 ========================= */
-if (isset($_POST['delete_area'])) {
+if (isset($_POST['archive_area'])) {
     verifyCsrf();
-
     $id = (int) $_POST['id'];
-    // Optional: check FK constraints before deleting
-    $stmt = $pdo->prepare("DELETE FROM areas WHERE id = ?");
-    $stmt->execute([$id]);
+    $pdo->prepare("UPDATE areas SET status = 'archived' WHERE id = ?")->execute([$id]);
+    header("Location: areas.php?archived=1");
+    exit;
+}
 
-    header("Location: areas.php?deleted=1");
+/* =========================
+   RESTORE AREA
+========================= */
+if (isset($_POST['restore_area'])) {
+    verifyCsrf();
+    $id = (int) $_POST['id'];
+    $pdo->prepare("UPDATE areas SET status = 'active' WHERE id = ?")->execute([$id]);
+    header("Location: areas.php?restored=1");
     exit;
 }
 
@@ -56,16 +62,13 @@ if (isset($_POST['delete_area'])) {
 ========================= */
 if (isset($_POST['update_area'])) {
     verifyCsrf();
-
     $id   = (int) $_POST['id'];
     $name = sanitizeAreaName($_POST['area_name'] ?? '');
-
     if ($name === '') {
         $message     = 'Area name cannot be empty.';
         $messageType = 'danger';
     } else {
-        $stmt = $pdo->prepare("UPDATE areas SET area_name = ? WHERE id = ?");
-        $stmt->execute([$name, $id]);
+        $pdo->prepare("UPDATE areas SET area_name = ? WHERE id = ?")->execute([$name, $id]);
         header("Location: areas.php?updated=1");
         exit;
     }
@@ -76,22 +79,18 @@ if (isset($_POST['update_area'])) {
 ========================= */
 if (isset($_POST['add_area'])) {
     verifyCsrf();
-
     $name = sanitizeAreaName($_POST['area_name'] ?? '');
-
     if ($name === '') {
         $message     = 'Area name cannot be empty.';
         $messageType = 'danger';
     } else {
-        // Prevent duplicate names
         $check = $pdo->prepare("SELECT id FROM areas WHERE LOWER(area_name) = LOWER(?)");
         $check->execute([$name]);
         if ($check->fetch()) {
             $message     = 'An area with that name already exists.';
             $messageType = 'danger';
         } else {
-            $stmt = $pdo->prepare("INSERT INTO areas (area_name) VALUES (?)");
-            $stmt->execute([$name]);
+            $pdo->prepare("INSERT INTO areas (area_name, status) VALUES (?, 'active')")->execute([$name]);
             header("Location: areas.php?added=1");
             exit;
         }
@@ -102,28 +101,51 @@ if (isset($_POST['add_area'])) {
    REDIRECT FLASH MESSAGES
 ========================= */
 if (!$message) {
-    if (isset($_GET['added']))   { $message = 'Area added successfully!';   $messageType = 'success'; }
-    if (isset($_GET['updated'])) { $message = 'Area updated successfully!'; $messageType = 'success'; }
-    if (isset($_GET['deleted'])) { $message = 'Area deleted.';              $messageType = 'success'; }
+    if (isset($_GET['added']))    { $message = 'Area added successfully!';    $messageType = 'success'; }
+    if (isset($_GET['updated']))  { $message = 'Area updated successfully!';  $messageType = 'success'; }
+    if (isset($_GET['archived'])) { $message = 'Area archived successfully.'; $messageType = 'warning'; }
+    if (isset($_GET['restored'])) { $message = 'Area restored successfully.'; $messageType = 'success'; }
 }
+
+/*
+ * =====================================================
+ *  LAYOUT INCLUDES — must come after ALL header()
+ *  redirects above, and before any HTML output below.
+ * =====================================================
+ */
+require_once __DIR__ . '/../../app/layouts/main.php';
+require_once __DIR__ . '/../../app/layouts/sidebar.php';
+
+/* =========================
+   STATUS FILTER
+========================= */
+$statusFilter = $_GET['status_filter'] ?? 'active';
+if (!in_array($statusFilter, ['active', 'archived', 'all'])) $statusFilter = 'active';
 
 /* =========================
    FETCH AREAS
 ========================= */
-$areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
+if ($statusFilter === 'all') {
+    $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM areas WHERE status = ? ORDER BY area_name ASC");
+    $stmt->execute([$statusFilter]);
+    $areas = $stmt->fetchAll();
+}
+
+$activeCount   = (int)$pdo->query("SELECT COUNT(*) FROM areas WHERE status = 'active'")->fetchColumn();
+$archivedCount = (int)$pdo->query("SELECT COUNT(*) FROM areas WHERE status = 'archived' OR status IS NULL")->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Area Management – AquaTrack</title>
+    <title>Area Management - AquaTrack</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        :root {
-            --brand: #0d6efd;
-        }
+        :root { --brand: #0d6efd; }
         body { background: #f0f2f5; }
 
         .page-header {
@@ -132,35 +154,61 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
             padding: 1rem 1.5rem;
             margin-bottom: 1.5rem;
         }
-        .page-header h4 {
-            font-weight: 700;
-            margin: 0;
-        }
+        .page-header h4 { font-weight: 700; margin: 0; }
 
         .card { border: none; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-
-        /* Search bar highlight */
         #areaSearch:focus { box-shadow: 0 0 0 3px rgba(13,110,253,.15); }
 
-        /* Table tweaks */
         .table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
         .table td { vertical-align: middle; }
 
-        /* Row fade-in */
         tbody tr { animation: rowIn .18s ease both; }
         @keyframes rowIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
 
-        /* Empty-state */
-        #emptyState { display: none; }
+        tr.row-archived { opacity: .65; background: #f8fafc; }
+
+        /* Status filter tabs */
+        .status-tabs { display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+        .status-tab {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: .82rem;
+            font-weight: 600;
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-tab:hover { border-color:#0ea5e9; color:#0284c7; }
+        .tab-active-active   { background:#0ea5e9; border-color:#0ea5e9; color:#fff !important; }
+        .tab-active-archived { background:#64748b; border-color:#64748b; color:#fff !important; }
+        .tab-active-all      { background:#0f172a; border-color:#0f172a; color:#fff !important; }
+        .tab-badge { background:rgba(255,255,255,.25); border-radius:20px; padding:1px 7px; font-size:.72rem; }
+        .status-tab:not([class*="tab-active"]) .tab-badge { background:#f1f5f9; color:#64748b; }
+
+        /* Status badge */
+        .status-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
+        .s-active   { background:#dcfce7; color:#15803d; }
+        .s-archived { background:#f1f5f9; color:#64748b; }
+        .status-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+        .dot-active   { background:#22c55e; }
+        .dot-archived { background:#94a3b8; }
+
+        #emptyState { display:none; }
     </style>
 </head>
 <body>
 
-<!-- ===== PAGE HEADER ===== -->
 <div class="page-header d-flex align-items-center gap-3">
     <i class="bi bi-map fs-4 text-primary"></i>
     <div>
         <h4>Service Areas</h4>
+        <small class="text-muted"><?= $activeCount ?> active &middot; <?= $archivedCount ?> archived</small>
     </div>
     <div class="ms-auto">
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAreaModal">
@@ -171,7 +219,6 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
 
 <div class="container-fluid px-4 pb-5">
 
-    <!-- Flash message -->
     <?php if ($message): ?>
         <div class="alert alert-<?= htmlspecialchars($messageType) ?> alert-dismissible fade show" role="alert">
             <?= htmlspecialchars($message) ?>
@@ -179,7 +226,26 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
         </div>
     <?php endif; ?>
 
-    <!-- Stats + Search bar -->
+    <!-- Status filter tabs -->
+    <div class="status-tabs">
+        <a href="?status_filter=active"
+           class="status-tab <?= $statusFilter === 'active'   ? 'tab-active-active'   : '' ?>">
+            <span class="status-dot dot-active"></span> Active
+            <span class="tab-badge"><?= $activeCount ?></span>
+        </a>
+        <a href="?status_filter=archived"
+           class="status-tab <?= $statusFilter === 'archived' ? 'tab-active-archived' : '' ?>">
+            <i class="bi bi-archive" style="font-size:.75rem"></i> Archived
+            <span class="tab-badge"><?= $archivedCount ?></span>
+        </a>
+        <a href="?status_filter=all"
+           class="status-tab <?= $statusFilter === 'all'      ? 'tab-active-all'      : '' ?>">
+            All Areas
+            <span class="tab-badge"><?= $activeCount + $archivedCount ?></span>
+        </a>
+    </div>
+
+    <!-- Stats + Search -->
     <div class="row g-3 mb-3 align-items-center">
         <div class="col-auto">
             <span class="badge bg-secondary fs-6">
@@ -192,12 +258,12 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
                     <i class="bi bi-search text-muted"></i>
                 </span>
                 <input id="areaSearch" type="search" class="form-control border-start-0 ps-0"
-                       placeholder="Search areas…" autocomplete="off">
+                       placeholder="Search areas..." autocomplete="off">
             </div>
         </div>
     </div>
 
-    <!-- Areas Table -->
+    <!-- Table -->
     <div class="card">
         <div class="table-responsive">
             <table class="table table-hover table-bordered mb-0">
@@ -205,37 +271,60 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
                     <tr>
                         <th style="width:60px">#</th>
                         <th>Area Name</th>
+                        <th style="width:120px" class="text-center">Status</th>
                         <th style="width:160px" class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="areaTableBody">
                 <?php if (empty($areas)): ?>
-                    <tr>
-                        <td colspan="3" class="text-center text-muted py-4">No areas found.</td>
-                    </tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">No areas found.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($areas as $i => $a): ?>
-                        <tr data-name="<?= htmlspecialchars(strtolower($a['area_name'])) ?>">
+                    <?php foreach ($areas as $i => $a):
+                        $aStatus  = $a['status'] ?? 'active';
+                        $rowClass = $aStatus === 'archived' ? ' class="row-archived"' : '';
+                    ?>
+                        <tr data-name="<?= htmlspecialchars(strtolower($a['area_name'])) ?>"<?= $rowClass ?>>
                             <td class="text-muted"><?= $i + 1 ?></td>
                             <td><strong><?= htmlspecialchars($a['area_name']) ?></strong></td>
                             <td class="text-center">
-                                <!-- Edit button → opens modal -->
-                                <button class="btn btn-outline-warning btn-sm me-1 btn-edit"
-                                        data-id="<?= (int)$a['id'] ?>"
-                                        data-name="<?= htmlspecialchars($a['area_name'], ENT_QUOTES) ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#editAreaModal">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
+                                <?php if ($aStatus === 'active'): ?>
+                                    <span class="status-badge s-active">
+                                        <span class="status-dot dot-active"></span>Active
+                                    </span>
+                                <?php else: ?>
+                                    <span class="status-badge s-archived">
+                                        <span class="status-dot dot-archived"></span>Archived
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button class="btn btn-outline-warning btn-sm btn-edit"
+                                            data-id="<?= (int)$a['id'] ?>"
+                                            data-name="<?= htmlspecialchars($a['area_name'], ENT_QUOTES) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editAreaModal">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
 
-                                <!-- Delete button → opens confirm modal -->
-                                <button class="btn btn-outline-danger btn-sm btn-delete"
-                                        data-id="<?= (int)$a['id'] ?>"
-                                        data-name="<?= htmlspecialchars($a['area_name'], ENT_QUOTES) ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#deleteAreaModal">
-                                    <i class="bi bi-trash-fill"></i>
-                                </button>
+                                    <?php if ($aStatus === 'active'): ?>
+                                    <button class="btn btn-outline-secondary btn-sm btn-archive"
+                                            data-id="<?= (int)$a['id'] ?>"
+                                            data-name="<?= htmlspecialchars($a['area_name'], ENT_QUOTES) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#archiveAreaModal">
+                                        <i class="bi bi-archive-fill"></i>
+                                    </button>
+                                    <?php else: ?>
+                                    <button class="btn btn-outline-success btn-sm btn-restore"
+                                            data-id="<?= (int)$a['id'] ?>"
+                                            data-name="<?= htmlspecialchars($a['area_name'], ENT_QUOTES) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#restoreAreaModal">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -243,34 +332,29 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
                 </tbody>
             </table>
         </div>
-        <!-- Empty search state -->
         <div id="emptyState" class="text-center text-muted py-4">
             <i class="bi bi-search fs-3 d-block mb-2"></i>
             No areas match your search.
         </div>
     </div>
 
-</div><!-- /container -->
+</div>
 
 
-<!-- ===================================================
-     MODAL: ADD AREA
-=================================================== -->
-<div class="modal fade" id="addAreaModal" tabindex="-1" aria-labelledby="addAreaModalLabel" aria-hidden="true">
+<!-- ADD MODAL -->
+<div class="modal fade" id="addAreaModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="addAreaModalLabel">
-                        <i class="bi bi-plus-circle me-2"></i>Add New Area
-                    </h5>
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add New Area</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label fw-semibold">Area Name <span class="text-danger">*</span></label>
                     <input type="text" name="area_name" class="form-control"
-                           placeholder="e.g. Zone A, Downtown, Brgy. San José"
+                           placeholder="e.g. Zone A, Downtown, Brgy. San Jose"
                            maxlength="100" required autofocus>
                     <div class="form-text">Maximum 100 characters.</div>
                 </div>
@@ -286,19 +370,15 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
 </div>
 
 
-<!-- ===================================================
-     MODAL: EDIT AREA
-=================================================== -->
-<div class="modal fade" id="editAreaModal" tabindex="-1" aria-labelledby="editAreaModalLabel" aria-hidden="true">
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editAreaModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
             <input type="hidden" name="id" id="editAreaId">
             <div class="modal-content">
                 <div class="modal-header bg-warning">
-                    <h5 class="modal-title" id="editAreaModalLabel">
-                        <i class="bi bi-pencil me-2"></i>Edit Area
-                    </h5>
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Area</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -319,30 +399,53 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
 </div>
 
 
-<!-- ===================================================
-     MODAL: DELETE CONFIRMATION
-=================================================== -->
-<div class="modal fade" id="deleteAreaModal" tabindex="-1" aria-labelledby="deleteAreaModalLabel" aria-hidden="true">
+<!-- ARCHIVE CONFIRM MODAL -->
+<div class="modal fade" id="archiveAreaModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-            <input type="hidden" name="id" id="deleteAreaId">
-            <div class="modal-content border-danger">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="deleteAreaModalLabel">
-                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete
-                    </h5>
+            <input type="hidden" name="id" id="archiveAreaId">
+            <div class="modal-content border-secondary">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="bi bi-archive me-2"></i>Archive Area</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center">
-                    <p class="mb-1">You are about to delete:</p>
-                    <p class="fw-bold fs-5" id="deleteAreaName"></p>
-                    <p class="text-muted small">This action cannot be undone.</p>
+                    <p class="mb-1">Archive this area?</p>
+                    <p class="fw-bold fs-5" id="archiveAreaName"></p>
+                    <p class="text-muted small mb-0">It can be restored later.</p>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button name="delete_area" class="btn btn-danger">
-                        <i class="bi bi-trash me-1"></i>Yes, Delete
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button name="archive_area" class="btn btn-secondary">
+                        <i class="bi bi-archive me-1"></i>Yes, Archive
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- RESTORE CONFIRM MODAL -->
+<div class="modal fade" id="restoreAreaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <form method="POST" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="id" id="restoreAreaId">
+            <div class="modal-content border-success">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Area</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-1">Restore this area to active?</p>
+                    <p class="fw-bold fs-5" id="restoreAreaName"></p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button name="restore_area" class="btn btn-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Yes, Restore
                     </button>
                 </div>
             </div>
@@ -353,7 +456,6 @@ $areas = $pdo->query("SELECT * FROM areas ORDER BY area_name ASC")->fetchAll();
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ---- Populate Edit Modal ---- */
 document.querySelectorAll('.btn-edit').forEach(btn => {
     btn.addEventListener('click', () => {
         document.getElementById('editAreaId').value   = btn.dataset.id;
@@ -361,15 +463,20 @@ document.querySelectorAll('.btn-edit').forEach(btn => {
     });
 });
 
-/* ---- Populate Delete Modal ---- */
-document.querySelectorAll('.btn-delete').forEach(btn => {
+document.querySelectorAll('.btn-archive').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.getElementById('deleteAreaId').value  = btn.dataset.id;
-        document.getElementById('deleteAreaName').textContent = btn.dataset.name;
+        document.getElementById('archiveAreaId').value         = btn.dataset.id;
+        document.getElementById('archiveAreaName').textContent = btn.dataset.name;
     });
 });
 
-/* ---- Live Search / Filter ---- */
+document.querySelectorAll('.btn-restore').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('restoreAreaId').value         = btn.dataset.id;
+        document.getElementById('restoreAreaName').textContent = btn.dataset.name;
+    });
+});
+
 const searchInput = document.getElementById('areaSearch');
 const rows        = document.querySelectorAll('#areaTableBody tr[data-name]');
 const emptyState  = document.getElementById('emptyState');
@@ -377,13 +484,11 @@ const emptyState  = document.getElementById('emptyState');
 searchInput.addEventListener('input', () => {
     const q = searchInput.value.toLowerCase().trim();
     let visible = 0;
-
     rows.forEach(row => {
         const match = row.dataset.name.includes(q);
         row.style.display = match ? '' : 'none';
         if (match) visible++;
     });
-
     emptyState.style.display = visible === 0 ? 'block' : 'none';
 });
 </script>

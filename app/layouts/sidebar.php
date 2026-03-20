@@ -46,19 +46,19 @@ if ($role === 'staff') {
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/users.php" 
-                class="nav-link <?= $currentPage === 'users.php' ? 'active bg-primary text-white' : 'text-white' ?>">👥 Users</a>
+                class="nav-link <?= $currentPage === 'users.php' ? 'active bg-primary text-white' : 'text-white' ?>">👥 User Management</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/areas.php" 
-                class="nav-link <?= $currentPage === 'areas.php' ? 'active bg-primary text-white' : 'text-white' ?>">📍 Areas</a>
+                class="nav-link <?= $currentPage === 'areas.php' ? 'active bg-primary text-white' : 'text-white' ?>">📍 Area Management</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/rates.php" 
-                class="nav-link <?= $currentPage === 'rates.php' ? 'active bg-primary text-white' : 'text-white' ?>">💰 Rates</a>
+                class="nav-link <?= $currentPage === 'rates.php' ? 'active bg-primary text-white' : 'text-white' ?>">💰 Rate Management</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/penalties.php"
-                class="nav-link <?= $currentPage === 'penalties.php' ? 'active bg-primary text-white' : 'text-white' ?>">⚠️ Penalties</a>
+                class="nav-link <?= $currentPage === 'penalties.php' ? 'active bg-primary text-white' : 'text-white' ?>">⚠️ Penalty Configuration</a>
             </li>
             <li class="nav-item">
                 <a href="/AquaTrack/modules/admin/service_requests.php"

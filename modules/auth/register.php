@@ -2,19 +2,19 @@
 require_once __DIR__ . '/../../app/config/database.php';
 
 function normalizePHPhone($phone)
-    {
-        $phone = preg_replace('/\D+/', '', $phone);
+{
+    $phone = preg_replace('/\D+/', '', $phone);
 
-        if (str_starts_with($phone, '09')) {
-            $phone = '63' . substr($phone, 1);
-        }
-
-        if (str_starts_with($phone, '639')) {
-            $phone = '+' . $phone;
-        }
-
-        return $phone;
+    if (str_starts_with($phone, '09')) {
+        $phone = '63' . substr($phone, 1);
     }
+
+    if (str_starts_with($phone, '639')) {
+        $phone = '+' . $phone;
+    }
+
+    return $phone;
+}
 
 $message = "";
 $success = false;
@@ -53,7 +53,7 @@ if (isset($_POST['register'])) {
 
     //Name validation
     else if (!preg_match($nameRegex, $first_name)) {
-    $message = "First name contains invalid characters.";
+        $message = "First name contains invalid characters.";
     }
     elseif (!preg_match($nameRegex, $last_name)) {
         $message = "Last name contains invalid characters.";
@@ -70,12 +70,18 @@ if (isset($_POST['register'])) {
         $emailCheck->execute([$email]);
         $emailExists = $emailCheck->fetchColumn();
 
+        $phoneCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE phone = ?");
+        $phoneCheck->execute([$phone]);
+        $phoneExists = $phoneCheck->fetchColumn();
+
         $meterCheck = $pdo->prepare("SELECT COUNT(*) FROM customers WHERE meter_number = ?");
         $meterCheck->execute([$meter_number]);
         $meterExists = $meterCheck->fetchColumn();
 
         if ($emailExists) {
             $message = "Email is already registered.";
+        } elseif ($phoneExists) {
+            $message = "That phone number is already registered to another account.";
         } elseif ($meterExists) {
             $message = "Meter number already exists.";
         } elseif ($first_name === '' || $last_name === '' || $address === '' || $email === '' || $password_input === '' || $area_id === '' || $meter_number === '') {
@@ -517,95 +523,92 @@ if (isset($_POST['register'])) {
 
 </script>
 
-    <script>
-        const emailInput = document.getElementById('email');
-        const emailFeedback = document.getElementById('emailFeedback');
+<script>
+    const emailInput = document.getElementById('email');
+    const emailFeedback = document.getElementById('emailFeedback');
 
-        let emailTimer; // debounce timer
+    let emailTimer;
 
-        emailInput.addEventListener('input', () => {
+    emailInput.addEventListener('input', () => {
 
-            const email = emailInput.value.trim();
-            const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+        const email = emailInput.value.trim();
+        const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
 
-            clearTimeout(emailTimer); // stop previous timer
+        clearTimeout(emailTimer);
 
-            if(email === ''){
-                emailFeedback.textContent = '';
-                emailInput.classList.remove('is-valid','is-invalid');
-                return;
-            }
+        if(email === ''){
+            emailFeedback.textContent = '';
+            emailInput.classList.remove('is-valid','is-invalid');
+            return;
+        }
 
-            // Step 1: Gmail validation
-            if(!gmailRegex.test(email)){
+        if(!gmailRegex.test(email)){
 
-                emailFeedback.textContent = 'Only Gmail addresses are allowed';
-                emailFeedback.className = 'text-danger small';
+            emailFeedback.textContent = 'Only Gmail addresses are allowed';
+            emailFeedback.className = 'text-danger small';
 
-                emailInput.classList.add('is-invalid');
-                emailInput.classList.remove('is-valid');
+            emailInput.classList.add('is-invalid');
+            emailInput.classList.remove('is-valid');
 
-                return;
-            }
+            return;
+        }
 
-            // Show checking message
-            emailFeedback.textContent = 'Checking email availability...';
-            emailFeedback.className = 'text-muted small';
+        emailFeedback.textContent = 'Checking email availability...';
+        emailFeedback.className = 'text-muted small';
 
-            // Step 2: Debounce database check (500ms)
-            emailTimer = setTimeout(() => {
+        emailTimer = setTimeout(() => {
 
-                fetch(`check_availability.php?email=${encodeURIComponent(email)}`)
-                .then(res => res.json())
-                .then(data => {
+            fetch(`check_availability.php?email=${encodeURIComponent(email)}`)
+            .then(res => res.json())
+            .then(data => {
 
-                    if (data.status === 'error') {
+                if (data.status === 'error') {
 
-                        emailFeedback.textContent = data.message;
-                        emailFeedback.className = 'text-danger small';
+                    emailFeedback.textContent = data.message;
+                    emailFeedback.className = 'text-danger small';
 
-                        emailInput.classList.add('is-invalid');
-                        emailInput.classList.remove('is-valid');
+                    emailInput.classList.add('is-invalid');
+                    emailInput.classList.remove('is-valid');
 
-                    } else {
+                } else {
 
-                        emailFeedback.textContent = 'Gmail is available';
-                        emailFeedback.className = 'text-success small';
+                    emailFeedback.textContent = 'Gmail is available';
+                    emailFeedback.className = 'text-success small';
 
-                        emailInput.classList.remove('is-invalid');
-                        emailInput.classList.add('is-valid');
-                    }
+                    emailInput.classList.remove('is-invalid');
+                    emailInput.classList.add('is-valid');
+                }
 
-                });
+            });
 
-            }, 500);
+        }, 500);
 
-        });
+    });
 
-        const meterInput = document.getElementById('meter_number');
-        const meterFeedback = document.getElementById('meterFeedback');
+    const meterInput = document.getElementById('meter_number');
+    const meterFeedback = document.getElementById('meterFeedback');
 
-        meterInput.addEventListener('blur', () => {
-            if (!meterInput.value) return;
+    meterInput.addEventListener('blur', () => {
+        if (!meterInput.value) return;
 
-            fetch(`check_availability.php?meter_number=${encodeURIComponent(meterInput.value)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'error') {
-                        meterFeedback.innerHTML = data.message;
-                        meterFeedback.className = 'text-danger';
-                        meterInput.classList.add('is-invalid');
-                    } else {
-                        meterFeedback.innerHTML = 'Meter number is available';
-                        meterFeedback.className = 'text-success';
-                        meterInput.classList.remove('is-invalid');
-                        meterInput.classList.add('is-valid');
-                    }
-                });
-        });
-    </script>
+        fetch(`check_availability.php?meter_number=${encodeURIComponent(meterInput.value)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'error') {
+                    meterFeedback.innerHTML = data.message;
+                    meterFeedback.className = 'text-danger';
+                    meterInput.classList.add('is-invalid');
+                } else {
+                    meterFeedback.innerHTML = 'Meter number is available';
+                    meterFeedback.className = 'text-success';
+                    meterInput.classList.remove('is-invalid');
+                    meterInput.classList.add('is-valid');
+                }
+            });
+    });
+</script>
 
-    <script>
+<script>
     const phoneInput = document.getElementById('phone');
     const phoneFeedback = document.getElementById('phoneFeedback');
 
@@ -619,11 +622,10 @@ if (isset($_POST['register'])) {
             return;
         }
 
+        // Normalize
         v = v.replace(/\s+/g,'').replace(/-/g,'');
-
         if (v.startsWith('09')) v = '+63' + v.substring(1);
         else if (v.startsWith('639')) v = '+' + v;
-
         this.value = v;
 
         const phRegex = /^\+639\d{9}$/;
@@ -633,121 +635,143 @@ if (isset($_POST['register'])) {
             phoneFeedback.className = 'text-danger small';
             this.classList.add('is-invalid');
             this.classList.remove('is-valid');
-        } else {
-            phoneFeedback.textContent = 'Valid phone number';
-            phoneFeedback.className = 'text-success small';
-            this.classList.add('is-valid');
-            this.classList.remove('is-invalid');
-        }
-    });
-    </script>
-
-    <script>
-        const passwordInput = document.getElementById('password');
-        const strengthBar = document.getElementById('strengthBar');
-        const strengthText = document.getElementById('strengthText');
-
-        passwordInput.addEventListener('input', () => {
-            const val = passwordInput.value;
-            let score = 0;
-
-            if (val.length >= 8) score++;
-            if (/[A-Z]/.test(val)) score++;
-            if (/[0-9]/.test(val)) score++;
-            if (/[^A-Za-z0-9]/.test(val)) score++;
-
-            let percent = (score / 4) * 100;
-            strengthBar.style.width = percent + '%';
-
-            strengthBar.className = 'progress-bar';
-
-            if (score <= 1) {
-                strengthBar.classList.add('bg-danger');
-                strengthText.textContent = 'Weak password';
-            } else if (score === 2) {
-                strengthBar.classList.add('bg-warning');
-                strengthText.textContent = 'Moderate password';
-            } else if (score === 3) {
-                strengthBar.classList.add('bg-info');
-                strengthText.textContent = 'Strong password';
-            } else {
-                strengthBar.classList.add('bg-success');
-                strengthText.textContent = 'Very strong password';
-            }
-        });
-    </script>
-
-    <script>
-
-    const password = document.getElementById('password');
-    const confirmPassword = document.getElementById('confirm_password');
-    const confirmFeedback = document.getElementById('confirmFeedback');
-    const registerBtn = document.getElementById('registerBtn');
-
-    function checkPasswords(){
-
-        if(confirmPassword.value === ''){
-            registerBtn.disabled = true;
             return;
         }
 
-        if(password.value !== confirmPassword.value){
+        // Format valid — check for duplicates in DB
+        phoneFeedback.textContent = 'Checking...';
+        phoneFeedback.className = 'text-muted small';
 
-            confirmFeedback.textContent = "Passwords do not match";
-            confirmFeedback.className = "text-danger small";
+        fetch(`check_availability.php?phone=${encodeURIComponent(v)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'error') {
+                    phoneFeedback.textContent = data.message;
+                    phoneFeedback.className = 'text-danger small';
+                    phoneInput.classList.add('is-invalid');
+                    phoneInput.classList.remove('is-valid');
+                } else {
+                    phoneFeedback.textContent = 'Valid phone number';
+                    phoneFeedback.className = 'text-success small';
+                    phoneInput.classList.remove('is-invalid');
+                    phoneInput.classList.add('is-valid');
+                }
+            })
+            .catch(() => {
+                // Network error — allow submit; server will recheck
+                phoneFeedback.textContent = 'Valid phone number';
+                phoneFeedback.className = 'text-success small';
+                phoneInput.classList.remove('is-invalid');
+                phoneInput.classList.add('is-valid');
+            });
+    });
+</script>
 
-            confirmPassword.classList.add("is-invalid");
-            confirmPassword.classList.remove("is-valid");
+<script>
+    const passwordInput = document.getElementById('password');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
 
-            registerBtn.disabled = true;
+    passwordInput.addEventListener('input', () => {
+        const val = passwordInput.value;
+        let score = 0;
 
-        }else{
+        if (val.length >= 8) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
 
-            confirmFeedback.textContent = "Passwords match";
-            confirmFeedback.className = "text-success small";
+        let percent = (score / 4) * 100;
+        strengthBar.style.width = percent + '%';
 
-            confirmPassword.classList.remove("is-invalid");
-            confirmPassword.classList.add("is-valid");
+        strengthBar.className = 'progress-bar';
 
-            registerBtn.disabled = false;
+        if (score <= 1) {
+            strengthBar.classList.add('bg-danger');
+            strengthText.textContent = 'Weak password';
+        } else if (score === 2) {
+            strengthBar.classList.add('bg-warning');
+            strengthText.textContent = 'Moderate password';
+        } else if (score === 3) {
+            strengthBar.classList.add('bg-info');
+            strengthText.textContent = 'Strong password';
+        } else {
+            strengthBar.classList.add('bg-success');
+            strengthText.textContent = 'Very strong password';
         }
+    });
+</script>
+
+<script>
+
+const password = document.getElementById('password');
+const confirmPassword = document.getElementById('confirm_password');
+const confirmFeedback = document.getElementById('confirmFeedback');
+const registerBtn = document.getElementById('registerBtn');
+
+function checkPasswords(){
+
+    if(confirmPassword.value === ''){
+        registerBtn.disabled = true;
+        return;
     }
 
-    password.addEventListener('input', checkPasswords);
-    confirmPassword.addEventListener('input', checkPasswords);
+    if(password.value !== confirmPassword.value){
+
+        confirmFeedback.textContent = "Passwords do not match";
+        confirmFeedback.className = "text-danger small";
+
+        confirmPassword.classList.add("is-invalid");
+        confirmPassword.classList.remove("is-valid");
+
+        registerBtn.disabled = true;
+
+    }else{
+
+        confirmFeedback.textContent = "Passwords match";
+        confirmFeedback.className = "text-success small";
+
+        confirmPassword.classList.remove("is-invalid");
+        confirmPassword.classList.add("is-valid");
+
+        registerBtn.disabled = false;
+    }
+}
+
+password.addEventListener('input', checkPasswords);
+confirmPassword.addEventListener('input', checkPasswords);
 
 
-    const togglePassword = document.getElementById("togglePassword");
-    const toggleConfirmPassword = document.getElementById("toggleConfirmPassword");
+const togglePassword = document.getElementById("togglePassword");
+const toggleConfirmPassword = document.getElementById("toggleConfirmPassword");
 
-    togglePassword.addEventListener("click", function(){
+togglePassword.addEventListener("click", function(){
 
-        const type = password.type === "password" ? "text" : "password";
-        password.type = type;
+    const type = password.type === "password" ? "text" : "password";
+    password.type = type;
 
-        this.innerHTML = type === "password"
-            ? '<i class="bi bi-eye"></i>'
-            : '<i class="bi bi-eye-slash"></i>';
-    });
+    this.innerHTML = type === "password"
+        ? '<i class="bi bi-eye"></i>'
+        : '<i class="bi bi-eye-slash"></i>';
+});
 
-    toggleConfirmPassword.addEventListener("click", function(){
+toggleConfirmPassword.addEventListener("click", function(){
 
-        const type = confirmPassword.type === "password" ? "text" : "password";
-        confirmPassword.type = type;
+    const type = confirmPassword.type === "password" ? "text" : "password";
+    confirmPassword.type = type;
 
-        this.innerHTML = type === "password"
-            ? '<i class="bi bi-eye"></i>'
-            : '<i class="bi bi-eye-slash"></i>';
-    });
+    this.innerHTML = type === "password"
+        ? '<i class="bi bi-eye"></i>'
+        : '<i class="bi bi-eye-slash"></i>';
+});
 
-    </script>
+</script>
 
 <?php if ($success): ?>
 <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
 
-            <!-- Gradient Top Banner -->
             <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
                         padding: 2rem;
                         text-align:center;
@@ -772,7 +796,6 @@ if (isset($_POST['register'])) {
                 </h4>
             </div>
 
-            <!-- Modal Body -->
             <div class="modal-body text-center p-4">
 
                 <p class="mb-2 fs-5 fw-semibold">

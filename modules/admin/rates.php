@@ -3,11 +3,10 @@ require_once __DIR__ . '/../../app/middleware/auth.php';
 checkRole(['admin']);
 
 require_once __DIR__ . '/../../app/config/database.php';
-require_once __DIR__ . '/../../app/layouts/main.php';
-require_once __DIR__ . '/../../app/layouts/sidebar.php';
 
 /* =========================
    CSRF TOKEN
+   Must be before any output.
 ========================= */
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (empty($_SESSION['csrf_token'])) {
@@ -31,23 +30,31 @@ function verifyCsrf(): void {
 function sanitizeRate(mixed $raw): float|false {
     $val = filter_var(trim((string)$raw), FILTER_VALIDATE_FLOAT);
     if ($val === false || $val < 0) return false;
-    return round($val, 4); // store up to 4 decimal places
+    return round($val, 4);
 }
 
 $message     = '';
 $messageType = 'success';
 
 /* =========================
-   DELETE RATE  (POST-based, CSRF-protected)
+   ARCHIVE RATE
 ========================= */
-if (isset($_POST['delete_rate'])) {
+if (isset($_POST['archive_rate'])) {
     verifyCsrf();
-
     $id = (int) $_POST['id'];
-    $stmt = $pdo->prepare("DELETE FROM rates WHERE id = ?");
-    $stmt->execute([$id]);
+    $pdo->prepare("UPDATE rates SET status = 'archived' WHERE id = ?")->execute([$id]);
+    header("Location: rates.php?archived=1");
+    exit;
+}
 
-    header("Location: rates.php?deleted=1");
+/* =========================
+   RESTORE RATE
+========================= */
+if (isset($_POST['restore_rate'])) {
+    verifyCsrf();
+    $id = (int) $_POST['id'];
+    $pdo->prepare("UPDATE rates SET status = 'active' WHERE id = ?")->execute([$id]);
+    header("Location: rates.php?restored=1");
     exit;
 }
 
@@ -56,16 +63,13 @@ if (isset($_POST['delete_rate'])) {
 ========================= */
 if (isset($_POST['update_rate'])) {
     verifyCsrf();
-
     $id   = (int) $_POST['id'];
     $rate = sanitizeRate($_POST['rate_per_unit'] ?? '');
-
     if ($rate === false) {
         $message     = 'Please enter a valid non-negative rate.';
         $messageType = 'danger';
     } else {
-        $stmt = $pdo->prepare("UPDATE rates SET rate_per_unit = ? WHERE id = ?");
-        $stmt->execute([$rate, $id]);
+        $pdo->prepare("UPDATE rates SET rate_per_unit = ? WHERE id = ?")->execute([$rate, $id]);
         header("Location: rates.php?updated=1");
         exit;
     }
@@ -76,15 +80,13 @@ if (isset($_POST['update_rate'])) {
 ========================= */
 if (isset($_POST['add_rate'])) {
     verifyCsrf();
-
     $rate = sanitizeRate($_POST['rate_per_unit'] ?? '');
-
     if ($rate === false) {
         $message     = 'Please enter a valid non-negative rate.';
         $messageType = 'danger';
     } else {
-        $stmt = $pdo->prepare("INSERT INTO rates (rate_per_unit, effective_from) VALUES (?, NOW())");
-        $stmt->execute([$rate]);
+        $pdo->prepare("INSERT INTO rates (rate_per_unit, effective_from, status) VALUES (?, NOW(), 'active')")
+            ->execute([$rate]);
         header("Location: rates.php?added=1");
         exit;
     }
@@ -94,24 +96,51 @@ if (isset($_POST['add_rate'])) {
    REDIRECT FLASH MESSAGES
 ========================= */
 if (!$message) {
-    if (isset($_GET['added']))   { $message = 'Rate added successfully!';   $messageType = 'success'; }
-    if (isset($_GET['updated'])) { $message = 'Rate updated successfully!'; $messageType = 'success'; }
-    if (isset($_GET['deleted'])) { $message = 'Rate deleted.';              $messageType = 'success'; }
+    if (isset($_GET['added']))    { $message = 'Rate added successfully!';    $messageType = 'success'; }
+    if (isset($_GET['updated']))  { $message = 'Rate updated successfully!';  $messageType = 'success'; }
+    if (isset($_GET['archived'])) { $message = 'Rate archived successfully.'; $messageType = 'warning'; }
+    if (isset($_GET['restored'])) { $message = 'Rate restored successfully.'; $messageType = 'success'; }
 }
+
+/*
+ * =====================================================
+ *  LAYOUT INCLUDES — must come after ALL header()
+ *  redirects above, and before any HTML output below.
+ * =====================================================
+ */
+require_once __DIR__ . '/../../app/layouts/main.php';
+require_once __DIR__ . '/../../app/layouts/sidebar.php';
+
+/* =========================
+   STATUS FILTER
+========================= */
+$statusFilter = $_GET['status_filter'] ?? 'active';
+if (!in_array($statusFilter, ['active', 'archived', 'all'])) $statusFilter = 'active';
 
 /* =========================
    FETCH RATES
 ========================= */
-$rates = $pdo->query("SELECT * FROM rates ORDER BY effective_from DESC")->fetchAll();
+if ($statusFilter === 'all') {
+    $rates = $pdo->query("SELECT * FROM rates ORDER BY effective_from DESC")->fetchAll();
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM rates WHERE status = ? ORDER BY effective_from DESC");
+    $stmt->execute([$statusFilter]);
+    $rates = $stmt->fetchAll();
+}
 
-/* Mark the latest/current rate */
-$latestId = !empty($rates) ? $rates[0]['id'] : null;
+// The current rate is always the most recent active one, regardless of filter view
+$currentRateRow = $pdo->query(
+    "SELECT * FROM rates WHERE status = 'active' ORDER BY effective_from DESC LIMIT 1"
+)->fetch();
+
+$activeCount   = (int)$pdo->query("SELECT COUNT(*) FROM rates WHERE status = 'active'")->fetchColumn();
+$archivedCount = (int)$pdo->query("SELECT COUNT(*) FROM rates WHERE status = 'archived' OR status IS NULL")->fetchColumn();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Rate Management – AquaTrack</title>
+    <title>Rate Management - AquaTrack</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -131,26 +160,56 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
         .table th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
         .table td { vertical-align: middle; }
 
-        /* Highlight current rate row */
         tr.current-rate td { background: #eaf4ff !important; }
+        tr.row-archived { opacity: .65; background: #f8fafc; }
 
         tbody tr { animation: rowIn .18s ease both; }
         @keyframes rowIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
 
-        #emptyState { display: none; }
-
-        /* Rate value styling */
         .rate-value { font-family: 'Courier New', monospace; font-weight: 600; font-size: 1rem; }
+
+        /* Status filter tabs */
+        .status-tabs { display:flex; gap:6px; margin-bottom:18px; flex-wrap:wrap; }
+        .status-tab {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: .82rem;
+            font-weight: 600;
+            border: 1.5px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-tab:hover { border-color:#0ea5e9; color:#0284c7; }
+        .tab-active-active   { background:#0ea5e9; border-color:#0ea5e9; color:#fff !important; }
+        .tab-active-archived { background:#64748b; border-color:#64748b; color:#fff !important; }
+        .tab-active-all      { background:#0f172a; border-color:#0f172a; color:#fff !important; }
+        .tab-badge { background:rgba(255,255,255,.25); border-radius:20px; padding:1px 7px; font-size:.72rem; }
+        .status-tab:not([class*="tab-active"]) .tab-badge { background:#f1f5f9; color:#64748b; }
+
+        /* Status badge */
+        .status-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:600; }
+        .s-active   { background:#dcfce7; color:#15803d; }
+        .s-archived { background:#f1f5f9; color:#64748b; }
+        .status-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+        .dot-active   { background:#22c55e; }
+        .dot-archived { background:#94a3b8; }
+
+        #emptyState { display: none; }
     </style>
 </head>
 <body>
 
-<!-- ===== PAGE HEADER ===== -->
 <div class="page-header d-flex align-items-center gap-3">
     <i class="bi bi-currency-exchange fs-4 text-primary"></i>
     <div>
         <h4>Water Rates</h4>
-        <small class="text-muted">Rate history per cubic meter (₱)</small>
+        <small class="text-muted">Rate history per cubic meter (&#8369;)</small>
     </div>
     <div class="ms-auto">
         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addRateModal">
@@ -161,7 +220,6 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
 
 <div class="container-fluid px-4 pb-5">
 
-    <!-- Flash message -->
     <?php if ($message): ?>
         <div class="alert alert-<?= htmlspecialchars($messageType) ?> alert-dismissible fade show" role="alert">
             <?= htmlspecialchars($message) ?>
@@ -169,20 +227,39 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
         </div>
     <?php endif; ?>
 
-    <!-- Current rate callout -->
-    <?php if (!empty($rates)): ?>
+    <!-- Current rate callout — always shows the latest active rate -->
+    <?php if ($currentRateRow): ?>
         <div class="alert alert-info d-flex align-items-center gap-2 mb-3">
             <i class="bi bi-info-circle-fill fs-5"></i>
             <div>
                 <strong>Current Rate:</strong>
-                ₱<?= number_format($rates[0]['rate_per_unit'], 2) ?> / m³
-                &nbsp;·&nbsp;
+                &#8369;<?= number_format($currentRateRow['rate_per_unit'], 2) ?> / m&sup3;
+                &nbsp;&middot;&nbsp;
                 <small class="text-muted">
-                    Effective <?= date('M d, Y', strtotime($rates[0]['effective_from'])) ?>
+                    Effective <?= date('M d, Y', strtotime($currentRateRow['effective_from'])) ?>
                 </small>
             </div>
         </div>
     <?php endif; ?>
+
+    <!-- Status filter tabs -->
+    <div class="status-tabs">
+        <a href="?status_filter=active"
+           class="status-tab <?= $statusFilter === 'active'   ? 'tab-active-active'   : '' ?>">
+            <span class="status-dot dot-active"></span> Active
+            <span class="tab-badge"><?= $activeCount ?></span>
+        </a>
+        <a href="?status_filter=archived"
+           class="status-tab <?= $statusFilter === 'archived' ? 'tab-active-archived' : '' ?>">
+            <i class="bi bi-archive" style="font-size:.75rem"></i> Archived
+            <span class="tab-badge"><?= $archivedCount ?></span>
+        </a>
+        <a href="?status_filter=all"
+           class="status-tab <?= $statusFilter === 'all'      ? 'tab-active-all'      : '' ?>">
+            All Rates
+            <span class="tab-badge"><?= $activeCount + $archivedCount ?></span>
+        </a>
+    </div>
 
     <!-- Stats + Search -->
     <div class="row g-3 mb-3 align-items-center">
@@ -197,7 +274,7 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
                     <i class="bi bi-search text-muted"></i>
                 </span>
                 <input id="rateSearch" type="search" class="form-control border-start-0 ps-0"
-                       placeholder="Search by rate or date…" autocomplete="off">
+                       placeholder="Search by rate or date..." autocomplete="off">
             </div>
         </div>
     </div>
@@ -209,55 +286,81 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
                 <thead class="table-dark">
                     <tr>
                         <th style="width:50px">#</th>
-                        <th>Rate per m³</th>
+                        <th>Rate per m&sup3;</th>
                         <th>Effective From</th>
-                        <th>Status</th>
-                        <th style="width:140px" class="text-center">Actions</th>
+                        <th style="width:130px">Label</th>
+                        <th style="width:110px" class="text-center">Status</th>
+                        <th style="width:150px" class="text-center">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="rateTableBody">
                 <?php if (empty($rates)): ?>
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No rates found.</td>
-                    </tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">No rates found.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($rates as $i => $r): ?>
-                        <?php
-                            $isLatest       = ($r['id'] == $latestId);
-                            $formattedDate  = date('M d, Y', strtotime($r['effective_from']));
-                            $searchIndex    = strtolower($r['rate_per_unit'] . ' ' . $formattedDate);
-                        ?>
-                        <tr class="<?= $isLatest ? 'current-rate' : '' ?>"
-                            data-search="<?= htmlspecialchars($searchIndex) ?>">
+                    <?php foreach ($rates as $i => $r):
+                        $rStatus       = $r['status'] ?? 'active';
+                        $isCurrentRate = $currentRateRow && ($r['id'] == $currentRateRow['id']);
+                        $rowClass      = $isCurrentRate ? 'current-rate' : ($rStatus === 'archived' ? 'row-archived' : '');
+                        $formattedDate = date('M d, Y', strtotime($r['effective_from']));
+                        $searchIndex   = strtolower($r['rate_per_unit'] . ' ' . $formattedDate);
+                    ?>
+                        <tr class="<?= $rowClass ?>" data-search="<?= htmlspecialchars($searchIndex) ?>">
                             <td class="text-muted"><?= $i + 1 ?></td>
                             <td>
-                                <span class="rate-value text-primary">₱<?= number_format((float)$r['rate_per_unit'], 4) ?></span>
+                                <span class="rate-value text-primary">&#8369;<?= number_format((float)$r['rate_per_unit'], 2) ?></span>
                             </td>
                             <td><?= htmlspecialchars($formattedDate) ?></td>
                             <td>
-                                <?php if ($isLatest): ?>
+                                <?php if ($isCurrentRate): ?>
                                     <span class="badge bg-success">Current</span>
+                                <?php elseif ($rStatus === 'archived'): ?>
+                                    <span class="badge bg-secondary">Archived</span>
                                 <?php else: ?>
                                     <span class="badge bg-secondary">Historical</span>
                                 <?php endif; ?>
                             </td>
                             <td class="text-center">
-                                <!-- Edit -->
-                                <button class="btn btn-outline-warning btn-sm me-1 btn-edit"
-                                        data-id="<?= (int)$r['id'] ?>"
-                                        data-rate="<?= htmlspecialchars($r['rate_per_unit'], ENT_QUOTES) ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#editRateModal">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </button>
-                                <!-- Delete -->
-                                <button class="btn btn-outline-danger btn-sm btn-delete"
-                                        data-id="<?= (int)$r['id'] ?>"
-                                        data-rate="₱<?= number_format((float)$r['rate_per_unit'], 2) ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#deleteRateModal">
-                                    <i class="bi bi-trash-fill"></i>
-                                </button>
+                                <?php if ($rStatus === 'active'): ?>
+                                    <span class="status-badge s-active">
+                                        <span class="status-dot dot-active"></span>Active
+                                    </span>
+                                <?php else: ?>
+                                    <span class="status-badge s-archived">
+                                        <span class="status-dot dot-archived"></span>Archived
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <!-- Edit -->
+                                    <button class="btn btn-outline-warning btn-sm btn-edit"
+                                            data-id="<?= (int)$r['id'] ?>"
+                                            data-rate="<?= htmlspecialchars($r['rate_per_unit'], ENT_QUOTES) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editRateModal">
+                                        <i class="bi bi-pencil-fill"></i>
+                                    </button>
+
+                                    <?php if ($rStatus === 'active'): ?>
+                                    <!-- Archive -->
+                                    <button class="btn btn-outline-secondary btn-sm btn-archive"
+                                            data-id="<?= (int)$r['id'] ?>"
+                                            data-rate="&#8369;<?= number_format((float)$r['rate_per_unit'], 2) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#archiveRateModal">
+                                        <i class="bi bi-archive-fill"></i>
+                                    </button>
+                                    <?php else: ?>
+                                    <!-- Restore -->
+                                    <button class="btn btn-outline-success btn-sm btn-restore"
+                                            data-id="<?= (int)$r['id'] ?>"
+                                            data-rate="&#8369;<?= number_format((float)$r['rate_per_unit'], 2) ?>"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#restoreRateModal">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -271,33 +374,29 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
         </div>
     </div>
 
-</div><!-- /container -->
+</div>
 
 
-<!-- ===================================================
-     MODAL: ADD RATE
-=================================================== -->
-<div class="modal fade" id="addRateModal" tabindex="-1" aria-labelledby="addRateModalLabel" aria-hidden="true">
+<!-- ADD MODAL -->
+<div class="modal fade" id="addRateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="addRateModalLabel">
-                        <i class="bi bi-plus-circle me-2"></i>Add New Rate
-                    </h5>
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add New Rate</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label fw-semibold">
-                        Rate per Cubic Meter (₱) <span class="text-danger">*</span>
+                        Rate per Cubic Meter (&#8369;) <span class="text-danger">*</span>
                     </label>
                     <div class="input-group">
-                        <span class="input-group-text">₱</span>
+                        <span class="input-group-text">&#8369;</span>
                         <input type="number" name="rate_per_unit" class="form-control"
                                step="0.0001" min="0" max="99999"
                                placeholder="e.g. 12.50" required autofocus>
-                        <span class="input-group-text">/ m³</span>
+                        <span class="input-group-text">/ m&sup3;</span>
                     </div>
                     <div class="form-text">The effective date will be set to today automatically.</div>
                 </div>
@@ -313,19 +412,15 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
 </div>
 
 
-<!-- ===================================================
-     MODAL: EDIT RATE
-=================================================== -->
-<div class="modal fade" id="editRateModal" tabindex="-1" aria-labelledby="editRateModalLabel" aria-hidden="true">
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editRateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
             <input type="hidden" name="id" id="editRateId">
             <div class="modal-content">
                 <div class="modal-header bg-warning">
-                    <h5 class="modal-title" id="editRateModalLabel">
-                        <i class="bi bi-pencil me-2"></i>Edit Rate
-                    </h5>
+                    <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Rate</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -334,13 +429,13 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
                         Editing a rate updates it in place. Consider adding a new rate instead to preserve history.
                     </div>
                     <label class="form-label fw-semibold">
-                        Rate per Cubic Meter (₱) <span class="text-danger">*</span>
+                        Rate per Cubic Meter (&#8369;) <span class="text-danger">*</span>
                     </label>
                     <div class="input-group">
-                        <span class="input-group-text">₱</span>
+                        <span class="input-group-text">&#8369;</span>
                         <input type="number" name="rate_per_unit" id="editRateValue" class="form-control"
                                step="0.0001" min="0" max="99999" required>
-                        <span class="input-group-text">/ m³</span>
+                        <span class="input-group-text">/ m&sup3;</span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -355,30 +450,53 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
 </div>
 
 
-<!-- ===================================================
-     MODAL: DELETE CONFIRMATION
-=================================================== -->
-<div class="modal fade" id="deleteRateModal" tabindex="-1" aria-labelledby="deleteRateModalLabel" aria-hidden="true">
+<!-- ARCHIVE CONFIRM MODAL -->
+<div class="modal fade" id="archiveRateModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-            <input type="hidden" name="id" id="deleteRateId">
-            <div class="modal-content border-danger">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title" id="deleteRateModalLabel">
-                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete
-                    </h5>
+            <input type="hidden" name="id" id="archiveRateId">
+            <div class="modal-content border-secondary">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="bi bi-archive me-2"></i>Archive Rate</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center">
-                    <p class="mb-1">You are about to delete rate:</p>
-                    <p class="fw-bold fs-5 text-danger" id="deleteRateValue"></p>
-                    <p class="text-muted small">This may affect billing records. This action cannot be undone.</p>
+                    <p class="mb-1">Archive this rate?</p>
+                    <p class="fw-bold fs-5 text-secondary" id="archiveRateValue"></p>
+                    <p class="text-muted small mb-0">It will be hidden from active lists but can be restored later.</p>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button name="delete_rate" class="btn btn-danger">
-                        <i class="bi bi-trash me-1"></i>Yes, Delete
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button name="archive_rate" class="btn btn-secondary">
+                        <i class="bi bi-archive me-1"></i>Yes, Archive
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- RESTORE CONFIRM MODAL -->
+<div class="modal fade" id="restoreRateModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <form method="POST" novalidate>
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="id" id="restoreRateId">
+            <div class="modal-content border-success">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-arrow-counterclockwise me-2"></i>Restore Rate</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="mb-1">Restore this rate to active?</p>
+                    <p class="fw-bold fs-5 text-success" id="restoreRateValue"></p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button name="restore_rate" class="btn btn-success">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Yes, Restore
                     </button>
                 </div>
             </div>
@@ -389,7 +507,6 @@ $latestId = !empty($rates) ? $rates[0]['id'] : null;
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ---- Populate Edit Modal ---- */
 document.querySelectorAll('.btn-edit').forEach(btn => {
     btn.addEventListener('click', () => {
         document.getElementById('editRateId').value    = btn.dataset.id;
@@ -397,15 +514,20 @@ document.querySelectorAll('.btn-edit').forEach(btn => {
     });
 });
 
-/* ---- Populate Delete Modal ---- */
-document.querySelectorAll('.btn-delete').forEach(btn => {
+document.querySelectorAll('.btn-archive').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.getElementById('deleteRateId').value        = btn.dataset.id;
-        document.getElementById('deleteRateValue').textContent = btn.dataset.rate;
+        document.getElementById('archiveRateId').value           = btn.dataset.id;
+        document.getElementById('archiveRateValue').textContent  = btn.dataset.rate;
     });
 });
 
-/* ---- Live Search / Filter ---- */
+document.querySelectorAll('.btn-restore').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('restoreRateId').value           = btn.dataset.id;
+        document.getElementById('restoreRateValue').textContent  = btn.dataset.rate;
+    });
+});
+
 const searchInput = document.getElementById('rateSearch');
 const rows        = document.querySelectorAll('#rateTableBody tr[data-search]');
 const emptyState  = document.getElementById('emptyState');
@@ -413,13 +535,11 @@ const emptyState  = document.getElementById('emptyState');
 searchInput.addEventListener('input', () => {
     const q = searchInput.value.toLowerCase().trim();
     let visible = 0;
-
     rows.forEach(row => {
         const match = row.dataset.search.includes(q);
         row.style.display = match ? '' : 'none';
         if (match) visible++;
     });
-
     emptyState.style.display = visible === 0 ? 'block' : 'none';
 });
 </script>
