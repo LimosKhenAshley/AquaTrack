@@ -3,8 +3,9 @@ require_once '../../app/middleware/auth.php';
 checkRole(['staff']);
 require_once '../../app/config/database.php';
 
-header('Content-Type: application/json');
-session_start();
+header('Content-Type: application/json'); // ← move to top, remove session_start()
+
+// REMOVE session_start(); ← same issue here
 
 if(!isset($_POST['csrf']) || $_POST['csrf'] !== $_SESSION['csrf']){
     exit(json_encode(['status'=>'error','message'=>'Invalid CSRF token']));
@@ -22,10 +23,6 @@ $stmt = $pdo->prepare("
     SET status='cancelled'
     WHERE id=? AND requested_by=? AND status='scheduled'
 ");
+$stmt->execute([$id, $userId]);
 
-$stmt->execute([$id,$userId]);
-
-echo json_encode([
-    'status'=>'success',
-    'message'=>'Request cancelled'
-]);
+echo json_encode(['status'=>'success','message'=>'Request cancelled']);
