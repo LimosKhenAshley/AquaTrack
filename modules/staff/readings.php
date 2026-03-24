@@ -32,11 +32,13 @@ $stmt = $pdo->prepare("
         c.meter_number,
         MAX(r.reading_date)  AS last_reading_date,
         MAX(r.reading_value) AS last_reading,
-        MAX(r.id)            AS last_reading_id
+        MAX(r.id)            AS last_reading_id,
+        b.status             AS bill_status
     FROM customers c
     JOIN users u ON c.user_id = u.id
     LEFT JOIN readings r ON c.id = r.customer_id
-    GROUP BY c.id, u.full_name, c.meter_number, c.service_status
+    LEFT JOIN bills b ON r.id = b.reading_id
+    GROUP BY c.id, u.full_name, c.meter_number, c.service_status, b.status
     ORDER BY c.meter_number ASC
 ");
 $stmt->execute();
@@ -79,11 +81,15 @@ if (isset($_POST['add_reading'])) {
 /* =============================
    HANDLE EDIT READING
 ============================= */
+/* =============================
+   HANDLE EDIT READING
+============================= */
 if (isset($_POST['edit_reading'])) {
     $reading_id  = $_POST['reading_id'];
     $newValue    = (float)$_POST['reading_value'];
     $readingDate = $_POST['reading_date'];
 
+    // Get reading info
     $s = $pdo->prepare("SELECT customer_id, reading_value FROM readings WHERE id = ?");
     $s->execute([$reading_id]);
     $reading = $s->fetch();
@@ -93,18 +99,31 @@ if (isset($_POST['edit_reading'])) {
     } elseif ($newValue <= 0) {
         $error = "Reading must be positive.";
     } else {
-        $amount = $newValue * $currentRate;
-        try {
-            $pdo->beginTransaction();
-            $s = $pdo->prepare("UPDATE readings SET reading_value = ?, reading_date = ? WHERE id = ?");
-            $s->execute([$newValue, $readingDate, $reading_id]);
-            $s = $pdo->prepare("UPDATE bills SET amount = ? WHERE reading_id = ?");
-            $s->execute([$amount, $reading_id]);
-            $pdo->commit();
-            $message = "Reading updated successfully!";
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $error = "Failed to update reading: " . $e->getMessage();
+
+        // 🔴 STEP 3: Check if bill already paid
+        $s = $pdo->prepare("SELECT status FROM bills WHERE reading_id = ?");
+        $s->execute([$reading_id]);
+        $billStatus = $s->fetchColumn();
+
+        if ($billStatus === 'paid') {
+            $error = "Cannot edit reading because the bill is already paid.";
+        } else {
+            $amount = $newValue * $currentRate;
+            try {
+                $pdo->beginTransaction();
+
+                $s = $pdo->prepare("UPDATE readings SET reading_value = ?, reading_date = ? WHERE id = ?");
+                $s->execute([$newValue, $readingDate, $reading_id]);
+
+                $s = $pdo->prepare("UPDATE bills SET amount = ? WHERE reading_id = ?");
+                $s->execute([$amount, $reading_id]);
+
+                $pdo->commit();
+                $message = "Reading updated successfully!";
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error = "Failed to update reading: " . $e->getMessage();
+            }
         }
     }
 }
@@ -376,14 +395,15 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content: '⇅'; }
                                     ➕ Add
                                 </button>
                                 <?php if ($c['last_reading'] !== null): ?>
-                                <button class="btn btn-warning btn-sm"
-                                    data-bs-toggle="modal" data-bs-target="#editReadingModal"
-                                    data-reading-id="<?= $c['last_reading_id'] ?>"
-                                    data-customer-name="<?= htmlspecialchars($c['full_name']) ?>"
-                                    data-reading-date="<?= $c['last_reading_date'] ?>"
-                                    data-reading-value="<?= $c['last_reading'] ?>">
-                                    ✏️ Edit
-                                </button>
+                                    <button class="btn btn-warning btn-sm"
+                                        <?= ($c['bill_status'] === 'paid') ? 'disabled title="Cannot edit — bill already paid"' : '' ?>
+                                        data-bs-toggle="modal" data-bs-target="#editReadingModal"
+                                        data-reading-id="<?= $c['last_reading_id'] ?>"
+                                        data-customer-name="<?= htmlspecialchars($c['full_name']) ?>"
+                                        data-reading-date="<?= $c['last_reading_date'] ?>"
+                                        data-reading-value="<?= $c['last_reading'] ?>">
+                                        ✏️ Edit
+                                    </button>
                                 <?php endif; ?>
                             </td>
                             <td>

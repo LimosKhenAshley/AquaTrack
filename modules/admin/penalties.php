@@ -3,11 +3,9 @@ require_once __DIR__ . '/../../app/middleware/auth.php';
 checkRole(['admin']);
 
 require_once __DIR__ . '/../../app/config/database.php';
-require_once __DIR__ . '/../../app/layouts/main.php';
-require_once __DIR__ . '/../../app/layouts/sidebar.php';
+require_once __DIR__ . '/../../app/helpers/audit_helper.php'; // ← add your auditLog include here
 
-$cfg = $pdo->query("SELECT * FROM penalty_settings LIMIT 1")->fetch();
-
+// Handle POST before ANY output
 if (isset($_POST['save'])) {
     $stmt = $pdo->prepare("
         UPDATE penalty_settings
@@ -24,16 +22,21 @@ if (isset($_POST['save'])) {
         isset($_POST['enabled']) ? 1 : 0
     ]);
 
-    header("Location: penalties.php?success=1");
-
     auditLog(
         $pdo,
         'PENALTY_UPDATE',
         'Penalty settings modified'
     );
 
+    header("Location: penalties.php?success=1");
     exit;
 }
+
+// Layouts included AFTER the redirect logic
+require_once __DIR__ . '/../../app/layouts/main.php';
+require_once __DIR__ . '/../../app/layouts/sidebar.php';
+
+$cfg = $pdo->query("SELECT * FROM penalty_settings LIMIT 1")->fetch();
 ?>
 
 <div class="container mt-4">

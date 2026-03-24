@@ -215,9 +215,6 @@ $top = $stmt->fetchAll();
                 <div class="col-md-2 align-self-end">
                     <a href="export_pdf.php?start=<?= $start ?>&end=<?= $end ?>" target="_blank" class="btn btn-danger w-100">PDF</a>
                 </div>
-
-                <div class="col-md-2 align-self-end">
-                    <button type="button" onclick="window.print()" class="btn btn-secondary w-100">Print</button>
                 </div>
             </form>
         </div>

@@ -3,8 +3,6 @@ require_once '../../app/middleware/auth.php';
 checkRole(['admin', 'staff']);
 
 require_once '../../app/config/database.php';
-require_once '../../app/layouts/main.php';
-require_once '../../app/layouts/sidebar.php';
 
 /* =========================
    CSRF TOKEN
@@ -69,6 +67,9 @@ $staffs = $pdo->query("
     JOIN   users u ON u.id = s.user_id
     ORDER  BY u.full_name
 ")->fetchAll();
+
+require_once '../../app/layouts/main.php';
+require_once '../../app/layouts/sidebar.php';
 
 /* Helpers */
 $statusColors = [

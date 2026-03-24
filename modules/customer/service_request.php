@@ -3,8 +3,6 @@ require_once '../../app/middleware/auth.php';
 checkRole(['customer']);
 
 require_once '../../app/config/database.php';
-require_once '../../app/layouts/main.php';
-require_once '../../app/layouts/sidebar.php';
 
 $user_id = $_SESSION['user']['id'];
 
@@ -45,6 +43,9 @@ $totalPages = ceil($totalRows / $limit);
  * Fetch Requests
  */
 $requests = getServiceRequests($pdo, $customer_id, $limit, $offset);
+
+require_once '../../app/layouts/main.php';
+require_once '../../app/layouts/sidebar.php';
 
 /**
  * Helper Functions
@@ -239,11 +240,12 @@ function formatDate($date) {
                                         </button>
 
                                         <?php if($request['status'] == 'open'): ?>
-                                            <a href="?cancel=<?= $request['id'] ?>"
-                                               class="btn btn-sm btn-danger"
-                                               onclick="return confirm('Are you sure you want to cancel this request?')">
+                                            <button 
+                                                class="btn btn-sm btn-danger"
+                                                onclick="confirmCancel(<?= $request['id'] ?>)"
+                                            >
                                                 Cancel
-                                            </a>
+                                            </button>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -408,20 +410,37 @@ function formatDate($date) {
 </div>
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <!-- Live Search Script -->
 <script>
-document.getElementById('searchInput').addEventListener('keyup', function() {
-    let filter = this.value.toLowerCase();
-    let rows = document.querySelectorAll("#requestTable tbody tr");
-    
-    rows.forEach(row => {
-        // Skip the "no results" row
-        if (row.children.length === 1 && row.children[0].colSpan === 6) return;
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll("#requestTable tbody tr");
         
-        let text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? "" : "none";
+        rows.forEach(row => {
+            if (row.children.length === 1 && row.children[0].colSpan === 6) return;
+            let text = row.innerText.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
     });
-});
+
+    function confirmCancel(requestId) {
+        Swal.fire({
+            title: 'Cancel Request?',
+            text: 'This action cannot be undone. Are you sure you want to cancel this request?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, cancel it',
+            cancelButtonText: 'No, keep it'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = '?cancel=' + requestId;
+            }
+        });
+    }
 </script>
 
 <?php require_once '../../app/layouts/footer.php'; ?>
