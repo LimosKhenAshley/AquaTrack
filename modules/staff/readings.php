@@ -454,6 +454,10 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content: '⇅'; }
                         <input type="date" name="reading_date" class="form-control" value="<?= date('Y-m-d') ?>" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Previous Reading</label>
+                        <input type="text" class="form-control" id="addPreviousReading" readonly>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Reading Value</label>
                         <input type="number" step="0.01" name="reading_value" class="form-control" required>
                     </div>
@@ -766,6 +770,7 @@ document.getElementById('addReadingModal').addEventListener('show.bs.modal', e =
     const btn = e.relatedTarget;
     document.getElementById('addCustomerId').value   = btn.dataset.customerId;
     document.getElementById('addCustomerName').value = btn.dataset.customerName;
+    document.getElementById('addPreviousReading').value = btn.dataset.lastReading || '0';
     document.querySelector('#addReadingModal input[name="reading_value"]').value = '';
     document.getElementById('estimatedBill').textContent = '0.00';
     document.getElementById('addModalMessage').innerHTML = '';
