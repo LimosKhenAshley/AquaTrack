@@ -33,12 +33,16 @@ $stmt = $pdo->prepare("
         MAX(r.reading_date)  AS last_reading_date,
         MAX(r.reading_value) AS last_reading,
         MAX(r.id)            AS last_reading_id,
-        b.status             AS bill_status
+        (
+            SELECT b2.status
+            FROM bills b2
+            WHERE b2.reading_id = MAX(r.id)
+            LIMIT 1
+        ) AS bill_status
     FROM customers c
     JOIN users u ON c.user_id = u.id
     LEFT JOIN readings r ON c.id = r.customer_id
-    LEFT JOIN bills b ON r.id = b.reading_id
-    GROUP BY c.id, u.full_name, c.meter_number, c.service_status, b.status
+    GROUP BY c.id, u.full_name, c.meter_number, c.service_status
     ORDER BY c.meter_number ASC
 ");
 $stmt->execute();
